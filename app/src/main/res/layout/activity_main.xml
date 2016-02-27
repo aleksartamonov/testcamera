@@ -21,5 +21,11 @@
         android:layout_height="fill_parent"
         android:layout_weight="20"
         android:text="Photo" />
+    <Button
+        android:id="@+id/button2"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_weight="20"
+        android:text="Get photo" />
 
 </LinearLayout>

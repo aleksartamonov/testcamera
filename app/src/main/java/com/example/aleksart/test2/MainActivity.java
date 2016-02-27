@@ -1,6 +1,7 @@
 package com.example.aleksart.test2;
 
 
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.app.Activity;
@@ -25,12 +26,18 @@ import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfKeyPoint;
+import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.imgcodecs.Imgcodecs;
 
+import java.io.IOException;
+
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener {
     public final int CAMERA_RESULT = 0;
+    private static final int FILE_SELECT_CODE = 1;
     private Button photo;
+    private Button getPhoto;
     private ImageView ivCamera;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -62,6 +69,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         photo = (Button) findViewById(R.id.button1);
+        getPhoto = (Button) findViewById(R.id.button2);
         ivCamera = (ImageView) findViewById(R.id.imageView1);
 
         photo.setOnClickListener(new OnClickListener() {
@@ -71,22 +79,51 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         MediaStore.ACTION_IMAGE_CAPTURE);
                 startActivityForResult(cameraIntent, CAMERA_RESULT);
             }
+        });
+        getPhoto.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("*/*");
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
 
+                startActivityForResult(
+                        Intent.createChooser(intent, "Select a File to Upload"),
+                        FILE_SELECT_CODE);
+            }
         });
 
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
         if (requestCode == CAMERA_RESULT) {
             Bitmap thumbnail = (Bitmap) data.getExtras().get("data");
-            Mat imageCV = new Mat();
-            Utils.bitmapToMat(thumbnail, imageCV);
-            Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_BGR2GRAY);
-            Imgproc.Canny(imageCV, imageCV, 50, 200);
-            Utils.matToBitmap(imageCV, thumbnail);
-            ivCamera.setImageBitmap(thumbnail);
+
+            ivCamera.setImageBitmap(getCanny(thumbnail));
+
+        } else if (requestCode == FILE_SELECT_CODE) {
+            Uri uri = data.getData();
+            try {
+                Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+                ivCamera.setImageBitmap(getCanny(bitmap));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.println(uri.getAuthority());
         }
+    }
+    private Bitmap getCanny(Bitmap thumbnail) {
+        Mat imageCV = new Mat();
+        Utils.bitmapToMat(thumbnail, imageCV);
+        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_BGR2GRAY);
+        Imgproc.Canny(imageCV, imageCV, 50, 200);
+//            FeatureDetector fd = FeatureDetector.create(FeatureDetector.SIFT);
+//            MatOfKeyPoint keypoints = new MatOfKeyPoint();
+//            fd.detect(imageCV,keypoints);
+        Utils.matToBitmap(imageCV, thumbnail);
+        return thumbnail;
     }
 
 
