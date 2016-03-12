@@ -65,6 +65,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private MatOfKeyPoint points = null;
     private final String fileName = "test.txt";
     private final int batchSize = 100;
+    private final int countPoint = 100;
 
     //    private String folderToSave = Environment.getExternalStorageDirectory()
 //            .toString();
@@ -218,7 +219,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-    private int findKeyPoints( InputStream input, Mat imageCV) {
+    private int findKeyPoints( InputStream input, Mat imageCV, int start) {
 
         int count = 0;
         try {
@@ -240,7 +241,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 double result = smo.classifyInstance(data.get(i));
 //                System.out.println(result);
                 if (result == 1) {
-                    Imgproc.circle(imageCV,keyPoints[i].pt,40,red);
+                    Imgproc.circle(imageCV,keyPoints[start + i].pt,40,red);
                     count++;
                 }
 
@@ -271,12 +272,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     sb.append(descriptors.get(i));
                     sb.append("\n");
                 }
-//                System.out.println(sb.toString());
                 InputStream inputStream = new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
                 sb.setLength(0);
-                count += findKeyPoints(inputStream, imageCV);
+                count += findKeyPoints(inputStream, imageCV, number * batchSize);
                 System.out.println(count+"..................");
-                if (count > 200) {
+                if (count > countPoint) {
                     Utils.matToBitmap(imageCV, b);
                     break;
                 }
@@ -285,7 +285,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
     private String getHeader(Descriptor descriptor) {
@@ -326,6 +325,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             result.add(getDescriptor(d,descriptorTest, i));
         }
         System.out.println("extract feature");
+//        Features2d.drawKeypoints(imageCV,points,imageCV);
+//        Utils.matToBitmap(imageCV, thumbnail);
         return result;
     }
 
