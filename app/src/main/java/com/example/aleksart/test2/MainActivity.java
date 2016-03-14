@@ -24,6 +24,7 @@ import org.opencv.android.Utils;
 import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfKeyPoint;
+import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
@@ -66,7 +67,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private final String fileName = "test.txt";
     private final int batchSize = 100;
     private final int countPoint = 100;
-
+    private int radius;
     //    private String folderToSave = Environment.getExternalStorageDirectory()
 //            .toString();
     private String folderToSave = "/storage/external_SD/DCIM/CAMERA";
@@ -124,9 +125,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private class Descriptor {
         private List<Double> data;
+
         public Descriptor(List<Double> e) {
             data = e;
         }
+
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -196,7 +199,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (fd == null) {
-            trainPhoto = getTrainPhoto();
+            fd = FeatureDetector.create(FeatureDetector.BRISK);
+            dExtractor = DescriptorExtractor.create(DescriptorExtractor.BRISK);
 
         }
         if (requestCode == CAMERA_RESULT) {
@@ -208,6 +212,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Uri uri = data.getData();
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+                radius = bitmap.getHeight()/20;
                 List<Descriptor> descriptors = getDescriptors(bitmap);
                 writeTestData(descriptors, fileName, bitmap);
 //                findKeyPoints(bitmap);
@@ -219,7 +224,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-    private int findKeyPoints( InputStream input, Mat imageCV, int start) {
+    private int findKeyPoints(InputStream input, Mat imageCV, int start) {
 
         int count = 0;
         try {
@@ -236,12 +241,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             data = Filter.useFilter(data, filter);
             data.setClassIndex(0);
             KeyPoint[] keyPoints = points.toArray();
-            Scalar red = new Scalar(255,0,0);
-            for (int i = 0; i <data.numInstances(); i++) {
+            Scalar red = new Scalar(255, 0, 0);
+            for (int i = 0; i < data.numInstances(); i++) {
                 double result = smo.classifyInstance(data.get(i));
 //                System.out.println(result);
                 if (result == 1) {
-                    Imgproc.circle(imageCV,keyPoints[start + i].pt,40,red);
+                    Imgproc.circle(imageCV, keyPoints[start + i].pt, radius, red);
                     count++;
                 }
 
@@ -258,7 +263,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return count;
     }
 
-    private void writeTestData(List<Descriptor> descriptors,String fileName, Bitmap b) {
+    private void writeTestData(List<Descriptor> descriptors, String fileName, Bitmap b) {
         StringBuilder sb = new StringBuilder();
         Mat imageCV = new Mat();
         Utils.bitmapToMat(b, imageCV);
@@ -266,20 +271,29 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         int number = 0;
         int count = 0;
         try {
-            while(true) {
+            while (true) {
                 sb.append(getHeader(descriptors.get(0)));
-                for (int i = number * batchSize ; i < descriptors.size() && i < number * batchSize + batchSize; i++){
+                for (int i = number * batchSize; i < descriptors.size() && i < number * batchSize + batchSize; i++) {
                     sb.append(descriptors.get(i));
                     sb.append("\n");
                 }
                 InputStream inputStream = new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
                 sb.setLength(0);
                 count += findKeyPoints(inputStream, imageCV, number * batchSize);
-                System.out.println(count+"..................");
-                if (count > countPoint) {
+                System.out.println(count + "..................");
+                if (number * batchSize >= descriptors.size()){
+                    Point a = new Point(10, b.getWidth()/2);
+                    Point c = new Point(b.getHeight()/2, b.getWidth()/2);
+                    Imgproc.line(imageCV,a,c,new Scalar(255,0,0));
                     Utils.matToBitmap(imageCV, b);
+
+                    System.out.println("count = "+ count+"  summary..."+descriptors.size());
                     break;
                 }
+//                if (count > countPoint) {
+//                    Utils.matToBitmap(imageCV, b);
+//                    break;
+//                }
                 number++;
             }
         } catch (Exception e) {
@@ -303,7 +317,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private List<Descriptor> getDescriptors(Bitmap thumbnail) {
         Mat imageCV = new Mat();
         Utils.bitmapToMat(thumbnail, imageCV);
-        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_BGR2GRAY);
+        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2HSV_FULL);
 
 
         points = new MatOfKeyPoint();
@@ -313,16 +327,20 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         dExtractor.compute(imageCV, points, descriptorTest);
         List<Descriptor> result = new ArrayList<Descriptor>();
         KeyPoint[] keyPoints = points.toArray();
+        System.out.println("height"+thumbnail.getHeight());
+        System.out.println("width"+thumbnail.getWidth());
         for (int i = 0; i < descriptorTest.height(); i++) {
-            List<Double> d = new ArrayList<Double>();
-            d.add((double) 0);
-            d.add((double) keyPoints[i].angle);
-            d.add((double) keyPoints[i].octave);
-            d.add((double) keyPoints[i].response);
-            d.add((double) keyPoints[i].size);
-            d.add((double) keyPoints[i].pt.x);
-            d.add((double) keyPoints[i].pt.y);
-            result.add(getDescriptor(d,descriptorTest, i));
+//            if (keyPoints[i].pt.x > thumbnail.getWidth()/2) {
+                List<Double> d = new ArrayList<Double>();
+                d.add((double) 0);
+                d.add((double) keyPoints[i].angle);
+                d.add((double) keyPoints[i].octave);
+                d.add((double) keyPoints[i].response);
+                d.add((double) keyPoints[i].size);
+                d.add((double) keyPoints[i].pt.x);
+                d.add((double) keyPoints[i].pt.y);
+                result.add(getDescriptor(d, descriptorTest, i));
+//            }
         }
         System.out.println("extract feature");
 //        Features2d.drawKeypoints(imageCV,points,imageCV);
@@ -330,10 +348,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return result;
     }
 
-    private Descriptor getDescriptor(List<Double> cur,Mat descriptors, int i) {
+    private Descriptor getDescriptor(List<Double> cur, Mat descriptors, int i) {
         List<Double> result = cur;
         for (int j = 0; j < descriptors.width(); j++) {
-            result.add(descriptors.get(i,j)[0]);
+            result.add(descriptors.get(i, j)[0]);
         }
         return new Descriptor(result);
     }
@@ -360,24 +378,5 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(Mat inputFrame) {
         return null;
     }
-
-    public List<TrainImage> getTrainPhoto() {
-        List<TrainImage> result = new ArrayList<TrainImage>();
-//        Field[] drawables = android.R.drawable.class.getFields();
-        fd = FeatureDetector.create(FeatureDetector.BRISK);
-        dMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMINGLUT);
-        dExtractor = DescriptorExtractor.create(DescriptorExtractor.BRISK);
-        Drawable drawable = getResources().getDrawable(R.drawable.black);
-        Bitmap cur = ((BitmapDrawable) drawable).getBitmap();
-        Mat mat = new Mat();
-        Utils.bitmapToMat(cur, mat);
-        MatOfKeyPoint keypoints = new MatOfKeyPoint();
-        fd.detect(mat, keypoints);
-        Mat descriptorTest = new Mat();
-        dExtractor.compute(mat, keypoints, descriptorTest);
-        result.add(new TrainImage(mat, keypoints, descriptorTest));
-
-
-        return result;
-    }
 }
+
