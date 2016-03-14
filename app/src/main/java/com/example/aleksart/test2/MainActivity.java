@@ -44,6 +44,7 @@ import java.util.Enumeration;
 import java.util.List;
 
 import weka.classifiers.functions.SMO;
+import weka.classifiers.trees.RandomForest;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -79,7 +80,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private FeatureDetector fd = null;
     private DescriptorMatcher dMatcher = null;
     private DescriptorExtractor dExtractor = null;
-    private SMO smo = null;
+    private RandomForest smo = null;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -186,7 +187,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private void loadSVM() {
         InputStream inputStream = getApplicationContext().getResources().openRawResource(R.raw.svm);
         try {
-            smo = (SMO) SerializationHelper.read(inputStream);
+            smo = (RandomForest) SerializationHelper.read(inputStream);
             System.out.println(smo.getTechnicalInformation());
             //test();
 
