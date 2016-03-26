@@ -23,8 +23,13 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfFloat;
+import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfKeyPoint;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
@@ -40,9 +45,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
 
+import weka.classifiers.Classifier;
 import weka.classifiers.functions.SMO;
 import weka.classifiers.trees.RandomForest;
 import weka.core.Attribute;
@@ -63,24 +70,21 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private Button photo;
     private Button getPhoto;
     private ImageView ivCamera;
-    private List<TrainImage> trainPhoto = new ArrayList<TrainImage>();
     private MatOfKeyPoint points = null;
     private final String fileName = "test.txt";
     private final int batchSize = 100;
     private final int countPoint = 100;
     private int radius;
-    //    private String folderToSave = Environment.getExternalStorageDirectory()
-//            .toString();
-    private String folderToSave = "/storage/external_SD/DCIM/CAMERA";
 
-//    private FeatureDetector fd = FeatureDetector.create(FeatureDetector.BRISK);
-//    private DescriptorMatcher dMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMINGLUT);
-//    private DescriptorExtractor dExtractor = DescriptorExtractor.create(DescriptorExtractor.BRISK);
+
+
 
     private FeatureDetector fd = null;
     private DescriptorMatcher dMatcher = null;
     private DescriptorExtractor dExtractor = null;
-    private RandomForest smo = null;
+    private Classifier smo = null;
+    List<Point> egorPoints = new ArrayList<Point>();
+    List<Integer> ans = new ArrayList<Integer>();
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -97,52 +101,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
         }
     };
-
-    private class TrainImage {
-        Mat mat;
-        MatOfKeyPoint matOfKeyPoint;
-        Mat descriptors;
-
-
-        public TrainImage(Mat mat, MatOfKeyPoint matOfKeyPoint, Mat descriptors) {
-            this.mat = mat;
-            this.matOfKeyPoint = matOfKeyPoint;
-            this.descriptors = descriptors;
-
-        }
-
-        public Mat getMat() {
-            return mat;
-        }
-
-        public Mat getDescriptors() {
-            return descriptors;
-        }
-
-        public MatOfKeyPoint getMatOfKeyPoint() {
-            return matOfKeyPoint;
-        }
-    }
-
-    private class Descriptor {
-        private List<Double> data;
-
-        public Descriptor(List<Double> e) {
-            data = e;
-        }
-
-        @Override
-        public String toString() {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < data.size() - 1; i++) {
-                sb.append(data.get(i));
-                sb.append(",");
-            }
-            sb.append(data.get(data.size() - 1));
-            return sb.toString();
-        }
-    }
-
 
     @Override
     public void onResume() {
@@ -188,8 +146,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         InputStream inputStream = getApplicationContext().getResources().openRawResource(R.raw.svm);
         try {
             smo = (RandomForest) SerializationHelper.read(inputStream);
-            System.out.println(smo.getTechnicalInformation());
-            //test();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -214,9 +170,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
                 radius = bitmap.getHeight()/20;
-                List<Descriptor> descriptors = getDescriptors(bitmap);
+                points = new MatOfKeyPoint();
+                List<Descriptor> descriptors = Descriptor.getDescriptors(bitmap, fd,points );
+
                 writeTestData(descriptors, fileName, bitmap);
-//                findKeyPoints(bitmap);
+                MatOfPoint mainContour = getAndWriteRect(bitmap);
+
                 ivCamera.setImageBitmap(bitmap);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -233,6 +192,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             loader.setSource(input);
 
             Instances data = loader.getDataSet();
+            data.setClassIndex(0);
+
             NumericToNominal filter = new NumericToNominal();
             String[] options = new String[2];
             options[0] = "-R";
@@ -240,15 +201,22 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             filter.setOptions(options);
             filter.setInputFormat(data);
             data = Filter.useFilter(data, filter);
-            data.setClassIndex(0);
+
             KeyPoint[] keyPoints = points.toArray();
             Scalar red = new Scalar(255, 0, 0);
+            Scalar yellow = new Scalar(255, 255, 0);
+
             for (int i = 0; i < data.numInstances(); i++) {
                 double result = smo.classifyInstance(data.get(i));
-//                System.out.println(result);
+                egorPoints.add(keyPoints[start+i].pt);
                 if (result == 1) {
-                    Imgproc.circle(imageCV, keyPoints[start + i].pt, radius, red);
+//                    Imgproc.circle(imageCV, keyPoints[start + i].pt, radius, red);
                     count++;
+                    ans.add(1);
+                }
+                else {
+//                    Imgproc.circle(imageCV, keyPoints[start + i].pt, radius, yellow);
+                    ans.add(0);
                 }
 
             }
@@ -264,37 +232,83 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return count;
     }
 
+    private MatOfPoint getAndWriteRect(Bitmap thumbnail) {
+        Mat imageCV = new Mat();
+        Mat imageRES = new Mat();
+        Utils.bitmapToMat(thumbnail, imageCV);
+        Utils.bitmapToMat(thumbnail, imageRES);
+        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2HSV_FULL);
+        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2GRAY);
+        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        Mat hierarchy = new Mat();
+        List<MatOfPoint> list = new ArrayList<MatOfPoint>();
+        Imgproc.threshold(imageCV,imageCV,128,255,0);
+        Imgproc.findContours(imageCV, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+
+        List<MatOfPoint2f> egor = new ArrayList<MatOfPoint2f>();
+        for (int i = 0;i < contours.size();i++){
+            double eps = 0.1*Imgproc.arcLength(new MatOfPoint2f(contours.get(i).toArray()),true);
+            MatOfPoint2f m = new MatOfPoint2f();
+            Imgproc.approxPolyDP(new MatOfPoint2f(contours.get(i).toArray()), m, eps, true);
+            if (m.height() == 4) {
+                list.add(new MatOfPoint(m.toArray()));
+                egor.add(m);
+            }
+        }
+        int r = voting(egorPoints, egor, ans);
+        List<MatOfPoint> dra = new ArrayList<MatOfPoint>();
+        dra.add(list.get(r));
+        Imgproc.drawContours(imageRES, dra, -1, new Scalar(0,255,0), 5);
+        Utils.matToBitmap(imageRES, thumbnail);
+        return dra.get(0);
+    }
+
+    private int voting(List<Point> points, List<MatOfPoint2f> contours, List<Integer> ans) {
+        int countourRating[] = new int[contours.size()];
+        Arrays.fill(countourRating, 0);
+        for (int i = 0;i < points.size(); i++) {
+            for (int j = 0; j < contours.size(); j++) {
+                double u = Imgproc.pointPolygonTest(contours.get(j), points.get(i), true);
+                if (u > 0) countourRating[j] += 100;
+                else countourRating[j] -= 1;
+            }
+        }
+        int best = -1, max = -(int)1e8;
+        for (int i = 0;i < contours.size();i++) {
+            if (countourRating[i] > max) {
+                best = i;
+                max = countourRating[i];
+            }
+        }
+        for (int i = 0;i < contours.size();i++)
+            System.out.println("the best point " + countourRating[i]);
+        System.out.println("Len " + best + " " + max);
+        return best;
+    }
+
     private void writeTestData(List<Descriptor> descriptors, String fileName, Bitmap b) {
         StringBuilder sb = new StringBuilder();
         Mat imageCV = new Mat();
         Utils.bitmapToMat(b, imageCV);
-//        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_BGR2GRAY);
         int number = 0;
         int count = 0;
         try {
             while (true) {
-                sb.append(getHeader(descriptors.get(0)));
+                sb.append((descriptors.get(0).getHeader()));
                 for (int i = number * batchSize; i < descriptors.size() && i < number * batchSize + batchSize; i++) {
                     sb.append(descriptors.get(i));
                     sb.append("\n");
                 }
                 InputStream inputStream = new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
+                System.out.println(sb.toString());
                 sb.setLength(0);
                 count += findKeyPoints(inputStream, imageCV, number * batchSize);
                 System.out.println(count + "..................");
                 if (number * batchSize >= descriptors.size()){
-                    Point a = new Point(10, b.getWidth()/2);
-                    Point c = new Point(b.getHeight()/2, b.getWidth()/2);
-                    Imgproc.line(imageCV,a,c,new Scalar(255,0,0));
-                    Utils.matToBitmap(imageCV, b);
-
                     System.out.println("count = "+ count+"  summary..."+descriptors.size());
                     break;
                 }
-//                if (count > countPoint) {
-//                    Utils.matToBitmap(imageCV, b);
-//                    break;
-//                }
+
                 number++;
             }
         } catch (Exception e) {
@@ -302,66 +316,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-    private String getHeader(Descriptor descriptor) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < descriptor.data.size() - 1; i++) {
-            sb.append("a");
-            sb.append(i);
-            sb.append(",");
-        }
-        sb.append("a");
-        sb.append(descriptor.data.size() - 1);
-        sb.append("\n");
-        return sb.toString();
-    }
-
-    private List<Descriptor> getDescriptors(Bitmap thumbnail) {
-        Mat imageCV = new Mat();
-        Utils.bitmapToMat(thumbnail, imageCV);
-        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2HSV_FULL);
-
-
-        points = new MatOfKeyPoint();
-        fd.detect(imageCV, points);
-
-        Mat descriptorTest = new Mat();
-        dExtractor.compute(imageCV, points, descriptorTest);
-        List<Descriptor> result = new ArrayList<Descriptor>();
-        KeyPoint[] keyPoints = points.toArray();
-        System.out.println("height"+thumbnail.getHeight());
-        System.out.println("width"+thumbnail.getWidth());
-        for (int i = 0; i < descriptorTest.height(); i++) {
-//            if (keyPoints[i].pt.x > thumbnail.getWidth()/2) {
-                List<Double> d = new ArrayList<Double>();
-                d.add((double) 0);
-                d.add((double) keyPoints[i].angle);
-                d.add((double) keyPoints[i].octave);
-                d.add((double) keyPoints[i].response);
-                d.add((double) keyPoints[i].size);
-                d.add((double) keyPoints[i].pt.x);
-                d.add((double) keyPoints[i].pt.y);
-                result.add(getDescriptor(d, descriptorTest, i));
-//            }
-        }
-        System.out.println("extract feature");
-//        Features2d.drawKeypoints(imageCV,points,imageCV);
-//        Utils.matToBitmap(imageCV, thumbnail);
-        return result;
-    }
-
-    private Descriptor getDescriptor(List<Double> cur, Mat descriptors, int i) {
-        List<Double> result = cur;
-        for (int j = 0; j < descriptors.width(); j++) {
-            result.add(descriptors.get(i, j)[0]);
-        }
-        return new Descriptor(result);
-    }
-
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-//        getMenuInflater().inflate(R.menu.main, menu);
+
         return true;
     }
 
