@@ -63,9 +63,7 @@ public class Descriptor {
             int maxy = Math.min((int) keyPoints[i].pt.y + hist_size, imageCV.height());
 
             Rect roi = new Rect(minx, miny, maxx - minx, maxy - miny);
-//        Rect roi = new Rect(100,100,30,30);
             Mat cropped = new Mat(imageCV, roi);
-//        System.out.println("after cropped=" + cropped.get(0, 0)[0] + " " + cropped.get(0, 0)[1] + " " + cropped.get(0,0)[2]);
             List<Mat> list = new ArrayList<Mat>();
             list.add(cropped);
 

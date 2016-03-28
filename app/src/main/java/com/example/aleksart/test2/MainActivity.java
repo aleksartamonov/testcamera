@@ -31,6 +31,7 @@ import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
 import org.opencv.features2d.FeatureDetector;
@@ -62,8 +63,6 @@ import weka.filters.Filter;
 import weka.filters.unsupervised.attribute.NumericToNominal;
 
 
-
-
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener {
     public final int CAMERA_RESULT = 0;
     private static final int FILE_SELECT_CODE = 1;
@@ -75,8 +74,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private final int batchSize = 100;
     private final int countPoint = 100;
     private int radius;
-
-
+    private final int EPS = 40;
 
 
     private FeatureDetector fd = null;
@@ -163,18 +161,19 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         if (requestCode == CAMERA_RESULT) {
             Bitmap thumbnail = (Bitmap) data.getExtras().get("data");
 
-//            ivCamera.setImageBitmap(getDescriptors(thumbnail));
 
         } else if (requestCode == FILE_SELECT_CODE) {
             Uri uri = data.getData();
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
-                radius = bitmap.getHeight()/20;
+                radius = bitmap.getHeight() / 20;
                 points = new MatOfKeyPoint();
-                List<Descriptor> descriptors = Descriptor.getDescriptors(bitmap, fd,points );
+                List<Descriptor> descriptors = Descriptor.getDescriptors(bitmap, fd, points);
 
                 writeTestData(descriptors, fileName, bitmap);
                 MatOfPoint mainContour = getAndWriteRect(bitmap);
+                Mat result = getRow(mainContour, bitmap);
+                bitmap  = getHigh(result);
 
                 ivCamera.setImageBitmap(bitmap);
             } catch (IOException e) {
@@ -183,6 +182,78 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             System.out.println(uri.getAuthority());
         }
     }
+
+    private Mat getRow(MatOfPoint mainContour, Bitmap bitmap) {
+        Mat imageCV = new Mat();
+        Utils.bitmapToMat(bitmap, imageCV);
+        System.out.println(mainContour.get(3, 0)[0] + " " + mainContour.get(3, 0)[1]);
+
+        List<Point> bottomPoints = getPoint(mainContour);
+        Point max_y = bottomPoints.get(0);
+        Point max_x = bottomPoints.get(1);
+        System.out.println(max_y);
+
+        Rect rect = new Rect((int) max_y.x, 0, (int) ((max_x.x - max_y.x) * 1.5), (int) (max_y.y + 10));
+        System.out.println("rect === " + rect);
+        System.out.println("heigh" + imageCV.height());
+        System.out.println("width" + imageCV.width());
+        imageCV = new Mat(imageCV, rect);
+
+        return imageCV;
+    }
+
+    private Bitmap getHigh(Mat row) {
+        Mat lines = new Mat();
+        Mat cur = new Mat();
+        Imgproc.cvtColor(row, cur, Imgproc.COLOR_BGR2GRAY);
+        Imgproc.Canny(cur, cur, 50, 200);
+        Imgproc.GaussianBlur(cur, cur, new Size(5, 5), 1);
+        Imgproc.HoughLinesP(cur, lines, 1, Math.PI / 2, 40, 150, 100);
+        Bitmap bitmap = Bitmap.createBitmap(row.width(), row.height(), Bitmap.Config.RGB_565);
+        Scalar r = new Scalar(255,0,0);
+        Point pt1;
+        Point pt2;
+        int centerSign = row.width()/3;
+        for (int  i =0; i < lines.height();i++ ) {
+            pt1 = new Point((int)lines.get(i,0)[0],(int)lines.get(i,0)[1]);
+            pt2 = new Point((int)lines.get(i,0)[2],(int)lines.get(i,0)[3]);
+            int midX = (int)(pt1.x + pt2.x)/2;
+            if (Math.abs(midX - centerSign) < EPS) {
+                System.out.println("p1 = " + pt1 + "    " + "p2  " + pt2);
+                Imgproc.line(cur, pt1, pt2, r, 10);
+            }
+        }
+        Utils.matToBitmap(cur,bitmap);
+
+        return bitmap;
+    }
+
+    private List<Point> getPoint(MatOfPoint contour) {
+        int med = 0;
+        for (int i = 0; i < 4; i++) {
+            med += contour.get(i, 0)[1];
+        }
+        med /= 4;
+        int min_x = 10000000;
+        int max_y = -1;
+        List<Point> current = new ArrayList<Point>();
+
+        for (int i = 0; i < 4; i++) {
+            if (contour.get(i, 0)[1] < med) {//y
+                current.add(new Point((int) contour.get(i, 0)[0], (int) contour.get(i, 0)[1]));
+                min_x = (int) contour.get(i, 0)[0];
+                max_y = (int) contour.get(i, 0)[1];
+            }
+        }
+        List<Point> result = new ArrayList<Point>();
+        if (current.get(0).x > current.get(1).x) {
+            result.add(current.get(1));
+            result.add(current.get(0));
+            return result;
+        }
+        return current;
+    }
+
 
     private int findKeyPoints(InputStream input, Mat imageCV, int start) {
 
@@ -208,13 +279,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
             for (int i = 0; i < data.numInstances(); i++) {
                 double result = smo.classifyInstance(data.get(i));
-                egorPoints.add(keyPoints[start+i].pt);
+                egorPoints.add(keyPoints[start + i].pt);
                 if (result == 1) {
 //                    Imgproc.circle(imageCV, keyPoints[start + i].pt, radius, red);
                     count++;
                     ans.add(1);
-                }
-                else {
+                } else {
 //                    Imgproc.circle(imageCV, keyPoints[start + i].pt, radius, yellow);
                     ans.add(0);
                 }
@@ -239,15 +309,16 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Utils.bitmapToMat(thumbnail, imageRES);
         Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2HSV_FULL);
         Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2GRAY);
+
         List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
         Mat hierarchy = new Mat();
         List<MatOfPoint> list = new ArrayList<MatOfPoint>();
-        Imgproc.threshold(imageCV,imageCV,128,255,0);
+        Imgproc.threshold(imageCV, imageCV, 128, 255, 0);
         Imgproc.findContours(imageCV, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
 
         List<MatOfPoint2f> egor = new ArrayList<MatOfPoint2f>();
-        for (int i = 0;i < contours.size();i++){
-            double eps = 0.1*Imgproc.arcLength(new MatOfPoint2f(contours.get(i).toArray()),true);
+        for (int i = 0; i < contours.size(); i++) {
+            double eps = 0.1 * Imgproc.arcLength(new MatOfPoint2f(contours.get(i).toArray()), true);
             MatOfPoint2f m = new MatOfPoint2f();
             Imgproc.approxPolyDP(new MatOfPoint2f(contours.get(i).toArray()), m, eps, true);
             if (m.height() == 4) {
@@ -258,7 +329,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         int r = voting(egorPoints, egor, ans);
         List<MatOfPoint> dra = new ArrayList<MatOfPoint>();
         dra.add(list.get(r));
-        Imgproc.drawContours(imageRES, dra, -1, new Scalar(0,255,0), 5);
+        Imgproc.drawContours(imageRES, dra, -1, new Scalar(0, 255, 0), 5);
         Utils.matToBitmap(imageRES, thumbnail);
         return dra.get(0);
     }
@@ -266,23 +337,23 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private int voting(List<Point> points, List<MatOfPoint2f> contours, List<Integer> ans) {
         int countourRating[] = new int[contours.size()];
         Arrays.fill(countourRating, 0);
-        for (int i = 0;i < points.size(); i++) {
+        for (int i = 0; i < points.size(); i++) {
             for (int j = 0; j < contours.size(); j++) {
                 double u = Imgproc.pointPolygonTest(contours.get(j), points.get(i), true);
                 if (u > 0) countourRating[j] += 100;
                 else countourRating[j] -= 1;
             }
         }
-        int best = -1, max = -(int)1e8;
-        for (int i = 0;i < contours.size();i++) {
+        int best = -1, max = -(int) 1e8;
+        for (int i = 0; i < contours.size(); i++) {
             if (countourRating[i] > max) {
                 best = i;
                 max = countourRating[i];
             }
         }
-        for (int i = 0;i < contours.size();i++)
-            System.out.println("the best point " + countourRating[i]);
-        System.out.println("Len " + best + " " + max);
+//        for (int i = 0; i < contours.size(); i++)
+//            System.out.println("the best point " + countourRating[i]);
+//        System.out.println("Len " + best + " " + max);
         return best;
     }
 
@@ -304,8 +375,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 sb.setLength(0);
                 count += findKeyPoints(inputStream, imageCV, number * batchSize);
                 System.out.println(count + "..................");
-                if (number * batchSize >= descriptors.size()){
-                    System.out.println("count = "+ count+"  summary..."+descriptors.size());
+                if (number * batchSize >= descriptors.size()) {
+                    System.out.println("count = " + count + "  summary..." + descriptors.size());
                     break;
                 }
 
