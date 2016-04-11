@@ -29,6 +29,7 @@ dependencies {
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:19.1.0'
     compile 'com.vividsolutions:jts:1.8'
+    compile 'com.commit451:PhotoView:1.2.5'
     compile project(':openCVLibrary310')
 //    compile files('libs/weka.jar')
     compile files('libs/openbeans-1.0.jar')

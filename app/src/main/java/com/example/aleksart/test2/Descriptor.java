@@ -9,6 +9,7 @@ import org.opencv.core.MatOfFloat;
 import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.Rect;
+import org.opencv.core.Size;
 import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 
@@ -40,6 +41,7 @@ public class Descriptor {
     public static List<Descriptor> getDescriptors(Bitmap thumbnail,FeatureDetector fd,MatOfKeyPoint points ) {
         Mat imageCV = new Mat();
         Utils.bitmapToMat(thumbnail, imageCV);
+//        Imgproc.resize(imageCV,imageCV,new Size(300,400));
 
         Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2HSV_FULL);
 
