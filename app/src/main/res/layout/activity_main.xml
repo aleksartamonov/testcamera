@@ -3,6 +3,7 @@
     android:layout_height="fill_parent"
     android:orientation="vertical" >
 
+
     <ImageView
         android:id="@+id/imageView1"
         android:layout_width="fill_parent"
@@ -10,10 +11,16 @@
         android:layout_weight="5" />
 
     <TextView
-        android:id="@+id/textView1"
-        android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:layout_weight="20" />
+        android:id="@+id/height"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+         />
+    <TextView
+        android:id="@+id/width"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+         />
+
 
     <Button
         android:id="@+id/button1"
@@ -27,5 +34,8 @@
         android:layout_height="fill_parent"
         android:layout_weight="20"
         android:text="Get photo" />
+
+
+
 
 </LinearLayout>

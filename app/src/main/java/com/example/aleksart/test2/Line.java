@@ -3,6 +3,7 @@ package com.example.aleksart.test2;
 import org.opencv.core.Point;
 
 import java.util.List;
+import java.util.logging.Level;
 
 /**
  * Created by sergej on 4/2/16.
@@ -26,6 +27,31 @@ public  class Line {
         p1.y += l.p1.y;
         p2.x += l.p2.x;
         p2.y += l.p2.y;
+        return this;
+    }
+
+    public Line add1(Line l) {
+        Line t = new Line((int)p1.x, (int)p1.y, (int)p2.x, (int)p2.y);
+        t.p1.x += l.p1.x;
+        t.p1.y += l.p1.y;
+        t.p2.x += l.p2.x;
+        t.p2.y += l.p2.y;
+        return t;
+    }
+
+
+    public Line multiply(int k) {
+        p1.x *= k;
+        p1.y *= k;
+        p2.x *= k;
+        p2.y *= k;
+        return this;
+
+    }
+
+    public Line addNum(int k) {
+        p1.x += k;
+        p2.x += k;
         return this;
 
     }

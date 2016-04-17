@@ -1,34 +1,30 @@
 package com.example.aleksart.test2;
 
 
-import android.content.Context;
-import android.graphics.Matrix;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
+
 import android.net.Uri;
 import android.os.Bundle;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.os.Environment;
 import android.view.Menu;
-import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.provider.MediaStore;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
-import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfFloat;
-import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
@@ -39,27 +35,24 @@ import org.opencv.core.Size;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
 import org.opencv.features2d.FeatureDetector;
-import org.opencv.features2d.Features2d;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
+import java.util.Date;
 import java.util.List;
 
 import uk.co.senab.photoview.PhotoViewAttacher;
 import weka.classifiers.Classifier;
-import weka.classifiers.functions.SMO;
 import weka.classifiers.trees.RandomForest;
-import weka.core.Attribute;
-import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.SerializationHelper;
 import weka.core.converters.CSVLoader;
@@ -71,26 +64,29 @@ import weka.filters.unsupervised.attribute.NumericToNominal;
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener {
     public final int CAMERA_RESULT = 0;
     private static final int FILE_SELECT_CODE = 1;
+
     private Button photo;
     private Button getPhoto;
     private ImageView ivCamera;
+    private TextView height;
+    private TextView width;
     private MatOfKeyPoint points = null;
     private final String fileName = "test.txt";
     private final int batchSize = 100;
-    private final int countPoint = 100;
-    private int radius;
-    private final int EPS = 40;
+    private final int RESIZE = 4;
+    private int SHIFT_OF_SMALL_CROPPED;
 
 
     private FeatureDetector fd = null;
-    private DescriptorMatcher dMatcher = null;
     private DescriptorExtractor dExtractor = null;
     private Classifier smo = null;
     List<Point> egorPoints = new ArrayList<Point>();
     List<Integer> ans = new ArrayList<Integer>();
-    private ScaleGestureDetector SGD;
-    private Matrix matrix = new Matrix();
-    private float scale = 1f;
+
+    private final int MIN_GOOD_POINTS = 10;
+
+    private String folderToSave = Environment.getExternalStorageDirectory()
+            .toString();
 
     PhotoViewAttacher mAttacher;
 
@@ -115,6 +111,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         super.onResume();
         OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_1_0, this, mLoaderCallback);
 
+
     }
 
 
@@ -126,6 +123,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         photo = (Button) findViewById(R.id.button1);
         getPhoto = (Button) findViewById(R.id.button2);
         ivCamera = (ImageView) findViewById(R.id.imageView1);
+        height = (TextView) findViewById(R.id.height);
+        width = (TextView) findViewById(R.id.width);
+        height.setText("height = need do");
+        width.setText("width = need do");
 //        trainPhoto = getTrainPhoto();
         photo.setOnClickListener(new OnClickListener() {
             @Override
@@ -147,21 +148,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         FILE_SELECT_CODE);
             }
         });
-        SGD = new ScaleGestureDetector(this,new ScaleListener());
         loadSVM();
-    }
-    private class ScaleListener extends ScaleGestureDetector.
-
-            SimpleOnScaleGestureListener {
-        @Override
-        public boolean onScale(ScaleGestureDetector detector) {
-            scale *= detector.getScaleFactor();
-            scale = Math.max(0.1f, Math.min(scale, 5.0f));
-
-            matrix.setScale(scale, scale);
-            ivCamera.setImageMatrix(matrix);
-            return true;
-        }
     }
 
     private void loadSVM() {
@@ -190,17 +177,68 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Uri uri = data.getData();
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
-
-                radius = bitmap.getHeight() / 20;
+                Bitmap resized = getResizeImage(bitmap);
                 points = new MatOfKeyPoint();
-                List<Descriptor> descriptors = Descriptor.getDescriptors(bitmap, fd, points);
 
-                writeTestData(descriptors, fileName, bitmap);
-                MatOfPoint mainContour = getAndWriteRect(bitmap);
+                List<Descriptor> descriptors = Descriptor.getDescriptors(resized, fd, points);
+
+                try {
+                    classify(descriptors);
+                } catch (RuntimeException e) {
+                    Toast toast = Toast.makeText(getApplicationContext(),
+                            e.getMessage(), Toast.LENGTH_LONG);
+                    toast.show();
+                    writeImageFile(bitmap);
+                    return;
+                }
+
+
+
+                MatOfPoint mainContour = getAndWriteRect(resized);
+                List<Line> signLines = getLinesFromContour(mainContour);
+                multiplyLines(signLines);
+
                 System.out.println("main contour");
-                Mat result = getRow(mainContour, bitmap);
-                Mat gray  = getHigh(result);
-                bitmap = getLines(gray,result);
+                Mat result = getRow(mainContour, resized);
+                Mat gray  = useFilter(result);
+                List<Line> vLines = new ArrayList<Line>();
+                try {
+                     vLines = getLines(gray, result);
+                } catch (RuntimeException e) {
+                    Toast toast = Toast.makeText(getApplicationContext(),
+                            "Could not find lines", Toast.LENGTH_LONG);
+                    toast.show();
+                    writeImageFile(bitmap);
+                    return;
+                }
+
+                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
+                multiplyLines(vLines);
+                Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
+                addNumLines(vLines, -SHIFT_OF_SMALL_CROPPED);
+                addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
+
+                gray  = useFilter(lastResult);
+                try {
+                    vLines = getLines(gray, result);
+                } catch (RuntimeException e) {
+                    Toast toast = Toast.makeText(getApplicationContext(),
+                            "Could not find lines", Toast.LENGTH_LONG);
+                    toast.show();
+                    writeImageFile(bitmap);
+                    return;
+                }
+//                Mat current = fitLines(vLines, signLines, lastResult);
+//                System.out.println("get 100 100"+ current.get(100,100)[0]);
+//                for (int i = 0; i < current.width(); i++) {
+//                    System.out.println(current.get(1000,i)[0]);
+//                }
+//                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
+//                Utils.matToBitmap(current, bitmap);
+                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
+                addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
+                bitmap = drawLines(vLines, bitmap);
+                bitmap = drawLines(signLines, bitmap);
 
                 ivCamera.setImageBitmap(bitmap);
                 mAttacher = new PhotoViewAttacher(ivCamera);
@@ -212,6 +250,57 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
+    private Mat fitLines(List<Line> vLines, List<Line> signLines, Mat lastResult) {
+        Mat gray = new Mat();
+        Imgproc.cvtColor(lastResult, gray,Imgproc.COLOR_BGR2GRAY);
+        Mat res = Fiting.improve(signLines, gray);
+        res = Fiting.improve(vLines, gray);
+        return res;
+    }
+
+    private void multiplyLines(List<Line> signLines) {
+        for (int i = 0;i < signLines.size(); i++) {
+            signLines.set(i,signLines.get(i).multiply(RESIZE));
+        }
+    }
+
+    private void addNumLines(List<Line> signLines, int num) {
+        for (int i = 0;i < signLines.size(); i++) {
+            signLines.set(i,signLines.get(i).addNum(num));
+        }
+    }
+
+    private List<Line> getLinesFromContour(MatOfPoint mainContour) {
+        List<Line> res = new ArrayList<Line>();
+        int len = mainContour.height();
+        for (int i = 0;i < len;i++) {
+            res.add(new Line(mainContour.get(i, 0)[0], mainContour.get(i, 0)[1],
+                    mainContour.get((i + 1) % len, 0)[0], mainContour.get((i + 1) % len, 0)[1]));
+        }
+        return res;
+    }
+
+    private MatOfPoint getMatFromLines(List<Line> lines) {
+        MatOfPoint result = new MatOfPoint();
+        List<Point> cur = new ArrayList<Point>();
+        cur.add(lines.get(0).getP1());
+        cur.add(lines.get(1).getP1());
+        cur.add(lines.get(2).getP1());
+        cur.add(lines.get(3).getP1());
+        result.fromList(cur);
+        return result;
+    }
+
+    private Bitmap getResizeImage(Bitmap bitmap) {
+        Mat image = new Mat();
+        Utils.bitmapToMat(bitmap, image);
+        Imgproc.resize(image, image, new Size(image.width() / RESIZE, image.height() / RESIZE));
+        bitmap = Bitmap.createBitmap(image.width(), image.height(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(image, bitmap);
+        return bitmap;
+
+    }
+
     private double length(double[] pts) {
         return (pts[0]-pts[2])*(pts[0]-pts[2]) + (pts[1]-pts[3])*(pts[1]-pts[3]);
     }
@@ -221,7 +310,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     }
 
-    private Bitmap getLines(Mat result, Mat colour) {
+    private List<Line> getLines(Mat result, Mat colour) {
         Mat lines = new Mat();
         int threshold = 100;
         Imgproc.threshold(result, result, 64, 255, 0);
@@ -271,22 +360,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         for (double e : line2) {
             System.out.print(e +" ");
         }
-        return drawLines(res,colour);
-//        ls.put(0,0,line1);
-//        System.out.println("line1");
+        return res;
 
-//        ls.put(1,0,line2);
-//        double[] cur = ls.get(0,0);
-//        System.out.println("getLines");
-//        for (double e : cur) {
-//            System.out.print(e +" ");
-//        }
-//        return drawLines(ls,colour);
 
 
     }
 
-    private Bitmap drawLines(List<Line> lines, Mat result) {
+    private Bitmap drawLines(List<Line> lines, Bitmap res) {
+        Mat result = new Mat();
+        Utils.bitmapToMat(res,result);
         Scalar r = new Scalar(255,0,0);
 
         for (int  i =0; i < lines.size();i++ ) {
@@ -294,7 +376,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Point pt1 = lines.get(i).getP1();
             Point pt2 = lines.get(i).getP2();
 
-            Imgproc.line(result, pt1, pt2, r, 5);
+            Imgproc.line(result, pt1, pt2, r, 1);
 
         }
         Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.RGB_565);
@@ -312,7 +394,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Point max_x = bottomPoints.get(1);
         System.out.println(max_y);
 
-        Rect rect = new Rect((int) max_y.x, 0, (int) ((max_x.x - max_y.x) * 1.5), (int) (max_y.y + 10));
+        Rect rect = new Rect((int) max_y.x - (int) ((max_x.x - max_y.x) * 1), 0, (int) ((max_x.x - max_y.x) * 3), (int) (max_y.y + 10));
+        SHIFT_OF_SMALL_CROPPED = (int) max_y.x - (int) ((max_x.x - max_y.x) * 1);
         System.out.println("rect === " + rect);
         System.out.println("heigh" + imageCV.height());
         System.out.println("width" + imageCV.width());
@@ -335,7 +418,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return res;
     }
 
-    private Mat getHigh(Mat row) {
+    private Mat useFilter(Mat row) {
 
         Mat lines = new Mat();
         Mat cur = new Mat(row.rows(),row.cols(),CvType.CV_32F);
@@ -376,15 +459,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             med += contour.get(i, 0)[1];
         }
         med /= 4;
-        int min_x = 10000000;
-        int max_y = -1;
         List<Point> current = new ArrayList<Point>();
 
         for (int i = 0; i < 4; i++) {
-            if (contour.get(i, 0)[1] < med) {//y
+            if (contour.get(i, 0)[1] <= med) {//y
                 current.add(new Point((int) contour.get(i, 0)[0], (int) contour.get(i, 0)[1]));
-                min_x = (int) contour.get(i, 0)[0];
-                max_y = (int) contour.get(i, 0)[1];
             }
         }
         List<Point> result = new ArrayList<Point>();
@@ -397,7 +476,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
 
-    private int findKeyPoints(InputStream input, Mat imageCV, int start) {
+    private int findKeyPoints(InputStream input, int start) {
 
         int count = 0;
         try {
@@ -474,7 +553,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         for (int i = 0; i < cur.height(); i++) {
             lines[i] = new Line(cur.get(i,0)[0],cur.get(i,0)[1],cur.get((i+1)%cur.height(),0)[0],cur.get((i+1)%cur.height(),0)[1]);
         }
-        lines = Fiting.improve(lines,imageCV);
         Scalar red = new Scalar(255,0,0);
         for (Line l : lines) {
             Imgproc.line(imageRES,l.getP1(),l.getP2(),red,10);
@@ -514,10 +592,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return best;
     }
 
-    private void writeTestData(List<Descriptor> descriptors, String fileName, Bitmap b) {
+    private void classify(List<Descriptor> descriptors) {
         StringBuilder sb = new StringBuilder();
-        Mat imageCV = new Mat();
-        Utils.bitmapToMat(b, imageCV);
         int number = 0;
         int count = 0;
         try {
@@ -530,7 +606,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 InputStream inputStream = new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
 //                System.out.println(sb.toString());
                 sb.setLength(0);
-                count += findKeyPoints(inputStream, imageCV, number * batchSize);
+                count += findKeyPoints(inputStream, number * batchSize);
                 System.out.println(count + "..................");
                 if (number * batchSize >= descriptors.size()) {
                     System.out.println("count = " + count + "  summary..." + descriptors.size());
@@ -542,7 +618,33 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         } catch (Exception e) {
             e.printStackTrace();
         }
+        if (count < MIN_GOOD_POINTS) {
+            throw new RuntimeException("dont find min count good points");
+        }
     }
+
+    private void writeImageFile(Bitmap bitmap) {
+        FileOutputStream fOut = null;
+        try {
+
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss")
+                    .format(new Date());
+            File file = new File(folderToSave, timeStamp + ".jpg");
+            fOut = new FileOutputStream(file);
+//            text.setText(file.getAbsolutePath());
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fOut);
+            fOut.flush();
+            fOut.close();
+
+        } catch (FileNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -565,4 +667,3 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return null;
     }
 }
-
