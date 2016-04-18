@@ -228,13 +228,18 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     writeImageFile(bitmap);
                     return;
                 }
-//                Mat current = fitLines(vLines, signLines, lastResult);
+                Mat current = new Mat();
+                List<Point> vPoints = lineToPoints(vLines, 0);
+                List<Point> signPoints = lineToPoints(signLines, 1);
+                current = fitLines(vPoints, signPoints, lastResult);
 //                System.out.println("get 100 100"+ current.get(100,100)[0]);
 //                for (int i = 0; i < current.width(); i++) {
 //                    System.out.println(current.get(1000,i)[0]);
 //                }
 //                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
 //                Utils.matToBitmap(current, bitmap);
+                vLines = pointToLines(vPoints);
+                signLines = pointToLines(signPoints);
                 addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
                 addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
                 bitmap = drawLines(vLines, bitmap);
@@ -250,23 +255,70 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-    private Mat fitLines(List<Line> vLines, List<Line> signLines, Mat lastResult) {
+    private List<Line> pointToLines(List<Point> vPoints) {
+        List<Line> lines = new ArrayList<Line>();
+        for (int i = 0;i < vPoints.size();i++) {
+            Point p1 = vPoints.get(i), p2 = vPoints.get((i+1)%vPoints.size());
+            lines.add(new Line(p1.x, p1.y, p2.x, p2.y));
+        }
+        return lines;
+    }
+
+    private List<Point> lineToPoints(List<Line> vLines, int key) {
+        Point p1, p2, p3, p4;
+        if (vLines.size() == 2) {
+            p1 = new Point(vLines.get(0).getP1().x, vLines.get(0).getP1().y);
+            p2 = new Point(vLines.get(0).getP2().x, vLines.get(0).getP2().y);
+            p3 = new Point(vLines.get(1).getP1().x, vLines.get(1).getP1().y);
+            p4 = new Point(vLines.get(1).getP2().x, vLines.get(1).getP2().y);
+        }
+        else {
+            p1 = new Point(vLines.get(0).getP1().x, vLines.get(0).getP1().y);
+            p2 = new Point(vLines.get(1).getP1().x, vLines.get(1).getP1().y);
+            p3 = new Point(vLines.get(2).getP1().x, vLines.get(2).getP1().y);
+            p4 = new Point(vLines.get(3).getP1().x, vLines.get(3).getP1().y);
+
+        }
+        if (key == 0) {
+            if (p1.y > p2.y) {
+                Point t = p1;
+                p1 = p2;
+                p2 = t;
+            }
+
+            if (p3.y < p4.y) {
+                Point t = p3;
+                p3 = p4;
+                p4 = t;
+            }
+        }
+        List<Point> points = new ArrayList<Point>();
+        points.add(p1);
+        points.add(p2);
+        points.add(p3);
+        points.add(p4);
+        return points;
+    }
+
+
+    private Mat fitLines(List<Point> vLines, List<Point> signPoints, Mat lastResult) {
         Mat gray = new Mat();
-        Imgproc.cvtColor(lastResult, gray,Imgproc.COLOR_BGR2GRAY);
-        Mat res = Fiting.improve(signLines, gray);
-        res = Fiting.improve(vLines, gray);
+        Imgproc.cvtColor(lastResult, gray, Imgproc.COLOR_BGR2GRAY);
+
+        Mat res = Fitting.improveSign(signPoints, gray);
+        //Fitting.improvePole(vLines, gray);
         return res;
     }
 
     private void multiplyLines(List<Line> signLines) {
         for (int i = 0;i < signLines.size(); i++) {
-            signLines.set(i,signLines.get(i).multiply(RESIZE));
+            signLines.set(i,signLines.get(i).multiply1(RESIZE));
         }
     }
 
     private void addNumLines(List<Line> signLines, int num) {
         for (int i = 0;i < signLines.size(); i++) {
-            signLines.set(i,signLines.get(i).addNum(num));
+            signLines.set(i, signLines.get(i).addNum(num));
         }
     }
 

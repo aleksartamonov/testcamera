@@ -10,6 +10,11 @@ import java.util.logging.Level;
  */
 public  class Line {
     private Point p1,p2;
+    Line(Line l){
+        p1 = new Point(l.getP1().x, l.getP1().y);
+        p2 = new Point(l.getP2().x, l.getP2().y);
+    }
+
     Line(Point p1,Point p2) {
         this.p1 = p1;
         this.p2 = p2;
@@ -22,12 +27,11 @@ public  class Line {
         p1 = new Point((int)x1,(int)y1);
         p2 = new Point((int)x2,(int)y2);
     }
-    public Line add(Line l) {
+    public void add(Line l) {
         p1.x += l.p1.x;
         p1.y += l.p1.y;
         p2.x += l.p2.x;
         p2.y += l.p2.y;
-        return this;
     }
 
     public Line add1(Line l) {
@@ -40,13 +44,20 @@ public  class Line {
     }
 
 
-    public Line multiply(int k) {
+    public void multiply(int k) {
         p1.x *= k;
         p1.y *= k;
         p2.x *= k;
         p2.y *= k;
-        return this;
+    }
 
+    public Line multiply1(int k) {
+        Line t = new Line((int)p1.x, (int)p1.y, (int)p2.x, (int)p2.y);
+        t.p1.x *= k;
+        t.p1.y *= k;
+        t.p2.x *= k;
+        t.p2.y *= k;
+        return t;
     }
 
     public Line addNum(int k) {
