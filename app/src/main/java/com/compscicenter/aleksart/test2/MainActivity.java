@@ -1,4 +1,4 @@
-package com.example.aleksart.test2;
+package com.compscicenter.aleksart.test2;
 
 
 
@@ -17,6 +17,9 @@ import android.provider.MediaStore;
 import android.widget.TextView;
 import android.widget.Toast;
 
+//import com.compscicenter.FitContour;
+import com.example.aleksart.test2.R;
+
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
@@ -33,7 +36,6 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.features2d.DescriptorExtractor;
-import org.opencv.features2d.DescriptorMatcher;
 import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 
@@ -120,6 +122,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
+//        String str = FitContour.getSomeString();
         photo = (Button) findViewById(R.id.button1);
         getPhoto = (Button) findViewById(R.id.button2);
         ivCamera = (ImageView) findViewById(R.id.imageView1);
@@ -231,13 +234,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 Mat current = new Mat();
                 List<Point> vPoints = lineToPoints(vLines, 0);
                 List<Point> signPoints = lineToPoints(signLines, 1);
-                current = fitLines(vPoints, signPoints, lastResult);
+                current = fitLines(vLines, signPoints, lastResult);
 //                System.out.println("get 100 100"+ current.get(100,100)[0]);
 //                for (int i = 0; i < current.width(); i++) {
 //                    System.out.println(current.get(1000,i)[0]);
 //                }
-//                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
-//                Utils.matToBitmap(current, bitmap);
+                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
+                Utils.matToBitmap(current, bitmap);
                 vLines = pointToLines(vPoints);
                 signLines = pointToLines(signPoints);
                 addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
@@ -301,12 +304,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
 
-    private Mat fitLines(List<Point> vLines, List<Point> signPoints, Mat lastResult) {
+    private Mat fitLines(List<Line> vLines, List<Point> signPoints, Mat lastResult) {
         Mat gray = new Mat();
         Imgproc.cvtColor(lastResult, gray, Imgproc.COLOR_BGR2GRAY);
 
-        Mat res = Fitting.improveSign(signPoints, gray);
-        //Fitting.improvePole(vLines, gray);
+//        Mat res = Fitting.improveSign(signPoints, gray);
+//        List<Line> lineRow = getLines(lastResult,null);
+        Mat res = Fitting.improvePole(vLines, lastResult);
+
         return res;
     }
 

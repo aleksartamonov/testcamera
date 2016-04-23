@@ -1,9 +1,6 @@
-package com.example.aleksart.test2;
+package com.compscicenter.aleksart.test2;
 
 import org.opencv.core.Point;
-
-import java.util.List;
-import java.util.logging.Level;
 
 /**
  * Created by sergej on 4/2/16.

@@ -1,4 +1,4 @@
-package com.example.aleksart.test2;
+package com.compscicenter.aleksart.test2;
 
 import android.graphics.Bitmap;
 
@@ -9,7 +9,6 @@ import org.opencv.core.MatOfFloat;
 import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.Rect;
-import org.opencv.core.Size;
 import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 
@@ -19,9 +18,13 @@ import java.util.List;
 /**
  * Created by sergej on 3/26/16.
  */
+
 public class Descriptor {
     private List<Integer> data;
 
+    public static String getStr(){
+        return "AAA";
+    }
 
     public Descriptor(List<Integer> e) {
         data = e;
