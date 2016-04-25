@@ -77,6 +77,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private final int batchSize = 100;
     private final int RESIZE = 4;
     private int SHIFT_OF_SMALL_CROPPED;
+    private double HEIGHT_OF_SIGN = 0.5;
 
 
     private FeatureDetector fd = null;
@@ -206,7 +207,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 Mat gray  = useFilter(result);
                 List<Line> vLines = new ArrayList<Line>();
                 try {
-                     vLines = getLines(gray, result);
+                    vLines = getLines(gray, result);
                 } catch (RuntimeException e) {
                     Toast toast = Toast.makeText(getApplicationContext(),
                             "Could not find lines", Toast.LENGTH_LONG);
@@ -234,20 +235,24 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 Mat current = new Mat();
                 List<Point> vPoints = lineToPoints(vLines, 0);
                 List<Point> signPoints = lineToPoints(signLines, 1);
-                current = fitLines(vLines, signPoints, lastResult);
+                vLines = fitLines(vLines, signPoints, lastResult);
 //                System.out.println("get 100 100"+ current.get(100,100)[0]);
 //                for (int i = 0; i < current.width(); i++) {
 //                    System.out.println(current.get(1000,i)[0]);
 //                }
-                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
-                Utils.matToBitmap(current, bitmap);
-                vLines = pointToLines(vPoints);
+//                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
+//                Utils.matToBitmap(current, bitmap);
+                //vLines = pointToLines(vPoints);
                 signLines = pointToLines(signPoints);
                 addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
                 addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
                 bitmap = drawLines(vLines, bitmap);
                 bitmap = drawLines(signLines, bitmap);
-
+                signLines = sortLines(signLines);
+                vLines = sortLines(vLines);
+                double heightRow = countHeight(signLines, vLines);
+                System.out.println("WE HAVE FOUND HEIGHT = " + height);
+                height.setText(Double.toString(heightRow));
                 ivCamera.setImageBitmap(bitmap);
                 mAttacher = new PhotoViewAttacher(ivCamera);
 
@@ -256,6 +261,68 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
 //            System.out.println(uri.getAuthority());
         }
+    }
+
+
+    private List<Line> sortLines(List<Line> lines) {
+        List<Line> result = new ArrayList<Line>();
+        double medX = 0, medY = 0;
+        for (Line p : lines) {
+            medX += p.getP1().x;
+            medY += p.getP1().y;
+            medX += p.getP2().x;
+            medY += p.getP2().y;
+        }
+        medX /= (lines.size() * 2);
+        medY /= (lines.size() * 2);
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
+                result.add(p);
+            }
+        }
+        for (Line p : lines) {
+            if ((p.getP1().x - medX) < 0 && (p.getP2().x - medX) < 0) {
+                result.add(p);
+            }
+        }
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
+                result.add(p);
+            }
+        }
+        for (Line p : lines) {
+            if ((p.getP1().x - medX) > 0 && (p.getP2().x - medX) > 0) {
+                result.add(p);
+            }
+        }
+        return result;
+    }
+
+    private double countHeight(List<Line> signLines, List<Line> vLines) {
+        System.out.println("getP1.x " + signLines.get(0).getP1().x + " getP1.y " + signLines.get(0).getP1().y);
+        System.out.println("getP2.x " + signLines.get(0).getP2().x + " getP2.y " + signLines.get(0).getP2().y);
+        System.out.println("getP1.x " + signLines.get(1).getP1().x + " getP1.y " + signLines.get(1).getP1().y);
+        System.out.println("getP2.x " + signLines.get(1).getP2().x + " getP2.y " + signLines.get(1).getP2().y);
+        System.out.println("getP1.x " + signLines.get(2).getP1().x + " getP1.y " + signLines.get(2).getP1().y);
+        System.out.println("getP2.x " + signLines.get(2).getP2().x + " getP2.y " + signLines.get(2).getP2().y);
+        System.out.println("SPASE");
+        System.out.println("getP1.x " + vLines.get(0).getP1().x + " getP1.y " + vLines.get(0).getP1().y);
+        System.out.println("getP2.x " + vLines.get(0).getP2().x + " getP2.y " + vLines.get(0).getP2().y);
+        System.out.println("getP1.x " + vLines.get(1).getP1().x + " getP1.y " + vLines.get(1).getP1().y);
+        System.out.println("getP2.x " + vLines.get(1).getP2().x + " getP2.y " + vLines.get(1).getP2().y);
+        System.out.println("getP1.x " + vLines.get(2).getP1().x + " getP1.y " + vLines.get(2).getP1().y);
+        System.out.println("getP2.x " + vLines.get(2).getP2().x + " getP2.y " + vLines.get(2).getP2().y);
+        double x1 = vLines.get(1).getP1().x;
+        double x2 = (signLines.get(1).getP1().x + signLines.get(1).getP2().x)/2;
+        double x3 = (signLines.get(3).getP1().x + signLines.get(3).getP2().x)/2;
+        double beta = 1/3*(x3-x1)/x3;
+        double k = (x3-x1)/(x3-x2);
+        System.out.println("TANGENS BETA " + Math.tan(beta));
+        System.out.println("BETA " + beta);
+        System.out.println("K " + k);
+        System.out.println("HEIGHT " + HEIGHT_OF_SIGN);
+        return Math.tan(beta)/beta*k*HEIGHT_OF_SIGN;
+
     }
 
     private List<Line> pointToLines(List<Point> vPoints) {
@@ -304,15 +371,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
 
-    private Mat fitLines(List<Line> vLines, List<Point> signPoints, Mat lastResult) {
+    private List<Line> fitLines(List<Line> vLines, List<Point> signPoints, Mat lastResult) {
         Mat gray = new Mat();
         Imgproc.cvtColor(lastResult, gray, Imgproc.COLOR_BGR2GRAY);
 
 //        Mat res = Fitting.improveSign(signPoints, gray);
 //        List<Line> lineRow = getLines(lastResult,null);
-        Mat res = Fitting.improvePole(vLines, lastResult);
+        return Fitting.improvePole(vLines, lastResult);
 
-        return res;
     }
 
     private void multiplyLines(List<Line> signLines) {
@@ -433,7 +499,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Point pt1 = lines.get(i).getP1();
             Point pt2 = lines.get(i).getP2();
 
-            Imgproc.line(result, pt1, pt2, r, 1);
+            Imgproc.line(result, pt1, pt2, r, 3);
 
         }
         Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.RGB_565);

@@ -85,7 +85,7 @@ public class Fitting {
     }
 
 
-    public static Mat improvePole(List<Line> lines, Mat img) {
+    public static List<Line> improvePole(List<Line> lines, Mat img) {
         List<List<Point>> result = new ArrayList<List<Point>>();
         for (int i = 0; i < lines.size(); i++) {
             result.add(new ArrayList<Point>());
@@ -146,13 +146,15 @@ public class Fitting {
                 best = i;
             }
         }
-        Imgproc.line(img,new Point(kAndB.get(0).x * (img.height() - best) + kAndB.get(0).y,best),
-        new Point(kAndB.get(1).x * (img.height() - best) + kAndB.get(1).y,best),red,3);
+        lines.clear();
+        lines.add(new Line(new Point(kAndB.get(0).x * (img.height() - best) + kAndB.get(0).y, best),
+                new Point(kAndB.get(0).y, img.height())));
+        lines.add(new Line(new Point(kAndB.get(0).x * (img.height() - best) + kAndB.get(0).y,best),
+                new Point(kAndB.get(1).x * (img.height() - best) + kAndB.get(1).y,best)));
+        lines.add(new Line(new Point(kAndB.get(1).x * (img.height()-best) + kAndB.get(1).y, best),
+                new Point(kAndB.get(1).y, img.height())));
 
-        Imgproc.line(img, new Point(kAndB.get(0).x * (img.height()-best) + kAndB.get(0).y, best), new Point(kAndB.get(0).y, img.height()), red, 3);
-        Imgproc.line(img, new Point(kAndB.get(1).x * (img.height()-best) + kAndB.get(1).y, best), new Point(kAndB.get(1).y, img.height()), red, 3);
-
-        return img;
+        return lines;
 
     }
 
@@ -167,7 +169,7 @@ public class Fitting {
         }
         System.out.println("xxx = "+xxx);
         System.out.println("xx = "+xx);
-        System.out.println("xxy = "+xxy);
+        System.out.println("xxy = " + xxy);
         return (xxy - (xy / xx) * xxx)*1.0/(xx -(x / xx) *xxx);
     }
 
@@ -189,4 +191,3 @@ public class Fitting {
                 /Math.sqrt( Math.pow(l.getP1().x - l.getP2().x,2 ) + Math.pow(l.getP1().y - l.getP2().y,2 ) ));
     }
 }
-
