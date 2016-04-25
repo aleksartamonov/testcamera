@@ -49,6 +49,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -508,6 +509,47 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 //        Utils.matToBitmap(cur,bitmap);
 
         return cur;
+    }
+
+    private List<Line> sortLines(List<Line> lines) {
+        List<Line> result = new ArrayList<Line>();
+        double medX = 0, medY = 0;
+        for (Line p : lines) {
+            medX += p.getP1().x;
+            medY += p.getP1().y;
+            medX += p.getP2().x;
+            medY += p.getP2().y;
+        }
+        medX /= (lines.size() * 2);
+        medY /= (lines.size() * 2);
+
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
+                result.add(p);
+            }
+        }
+
+        for (Line p : lines) {
+            if ((p.getP1().x - medX) < 0 && (p.getP2().x - medX) < 0) {
+                result.add(p);
+            }
+        }
+
+
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
+                result.add(p);
+            }
+        }
+
+
+        for (Line p : lines) {
+            if ((p.getP1().x - medX) > 0 && (p.getP2().x - medX) > 0) {
+                result.add(p);
+            }
+        }
+
+        return result;
     }
 
     private List<Point> getPoint(MatOfPoint contour) {
