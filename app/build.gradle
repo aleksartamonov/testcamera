@@ -35,4 +35,5 @@ dependencies {
     compile files('libs/openbeans-1.0.jar')
     compile files('libs/wekaSTRIPPED.jar')
 //    compile 'nz.ac.waikato.cms.weka:weka-dev:3.7.13'
+    androidTestCompile 'junit:junit:4.12'
 }

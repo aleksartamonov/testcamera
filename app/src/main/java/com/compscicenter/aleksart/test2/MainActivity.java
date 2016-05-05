@@ -2,6 +2,8 @@ package com.compscicenter.aleksart.test2;
 
 
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.app.Activity;
@@ -74,11 +76,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private TextView height;
     private TextView width;
     private MatOfKeyPoint points = null;
+    private AlertDialog choose = null;
     private final String fileName = "test.txt";
     private final int batchSize = 100;
     private final int RESIZE = 4;
     private int SHIFT_OF_SMALL_CROPPED;
-    private double HEIGHT_OF_SIGN = 0.5;
+    private double HEIGHT_OF_SIGN = 0.7;
+    private double imageHeight;
+    private boolean isHeight = true;
+
 
 
     private FeatureDetector fd = null;
@@ -132,13 +138,29 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         width = (TextView) findViewById(R.id.width);
         height.setText("height = need do");
         width.setText("width = need do");
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+// Add the buttons
+        builder.setPositiveButton("width", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                isHeight = false;
+            }
+        });
+        builder.setNegativeButton("height", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                // User cancelled the dialog
+            }
+        });
+
+
+// Create the AlertDialog
+        choose= builder.create();
+
 //        trainPhoto = getTrainPhoto();
         photo.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent cameraIntent = new Intent(
-                        MediaStore.ACTION_IMAGE_CAPTURE);
-                startActivityForResult(cameraIntent, CAMERA_RESULT);
+                choose.show();
             }
         });
         getPhoto.setOnClickListener(new OnClickListener() {
@@ -182,6 +204,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Uri uri = data.getData();
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+                imageHeight = bitmap.getHeight();
                 Bitmap resized = getResizeImage(bitmap);
                 points = new MatOfKeyPoint();
 
@@ -250,7 +273,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 bitmap = drawLines(vLines, bitmap);
                 bitmap = drawLines(signLines, bitmap);
                 signLines = sortLines(signLines);
-                vLines = sortLines(vLines);
                 double heightRow = countHeight(signLines, vLines);
                 System.out.println("WE HAVE FOUND HEIGHT = " + height);
                 height.setText(Double.toString(heightRow));
@@ -262,41 +284,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
 //            System.out.println(uri.getAuthority());
         }
-    }
-
-
-    private List<Line> sortLines(List<Line> lines) {
-        List<Line> result = new ArrayList<Line>();
-        double medX = 0, medY = 0;
-        for (Line p : lines) {
-            medX += p.getP1().x;
-            medY += p.getP1().y;
-            medX += p.getP2().x;
-            medY += p.getP2().y;
-        }
-        medX /= (lines.size() * 2);
-        medY /= (lines.size() * 2);
-        for (Line p : lines) {
-            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
-                result.add(p);
-            }
-        }
-        for (Line p : lines) {
-            if ((p.getP1().x - medX) < 0 && (p.getP2().x - medX) < 0) {
-                result.add(p);
-            }
-        }
-        for (Line p : lines) {
-            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
-                result.add(p);
-            }
-        }
-        for (Line p : lines) {
-            if ((p.getP1().x - medX) > 0 && (p.getP2().x - medX) > 0) {
-                result.add(p);
-            }
-        }
-        return result;
     }
 
     private double countHeight(List<Line> signLines, List<Line> vLines) {
@@ -313,11 +300,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         System.out.println("getP2.x " + vLines.get(1).getP2().x + " getP2.y " + vLines.get(1).getP2().y);
         System.out.println("getP1.x " + vLines.get(2).getP1().x + " getP1.y " + vLines.get(2).getP1().y);
         System.out.println("getP2.x " + vLines.get(2).getP2().x + " getP2.y " + vLines.get(2).getP2().y);
-        double x1 = vLines.get(1).getP1().x;
-        double x2 = (signLines.get(1).getP1().x + signLines.get(1).getP2().x)/2;
-        double x3 = (signLines.get(3).getP1().x + signLines.get(3).getP2().x)/2;
-        double beta = 1/3*(x3-x1)/x3;
-        double k = (x3-x1)/(x3-x2);
+        double x1 = vLines.get(1).getP1().y;
+        double x2 = (signLines.get(1).getP1().y + signLines.get(1).getP2().y)/2;
+        double x3 = (signLines.get(3).getP1().y + signLines.get(3).getP2().y)/2;
+        double beta = (1.0/3.0*(x3-x1)/imageHeight)*Math.PI;
+        double k = (x3-x1)/(x3-x2)+1;
         System.out.println("TANGENS BETA " + Math.tan(beta));
         System.out.println("BETA " + beta);
         System.out.println("K " + k);
@@ -590,20 +577,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         medY /= (lines.size() * 2);
 
         for (Line p : lines) {
-            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
-                result.add(p);
-            }
-        }
-
-        for (Line p : lines) {
             if ((p.getP1().x - medX) < 0 && (p.getP2().x - medX) < 0) {
                 result.add(p);
             }
         }
 
-
         for (Line p : lines) {
-            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
+            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
                 result.add(p);
             }
         }
@@ -614,6 +594,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 result.add(p);
             }
         }
+
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
+                result.add(p);
+            }
+        }
+
+
 
         return result;
     }
