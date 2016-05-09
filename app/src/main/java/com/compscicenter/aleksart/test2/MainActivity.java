@@ -201,92 +201,175 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
         } else if (requestCode == FILE_SELECT_CODE) {
-            Uri uri = data.getData();
-            try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
-                imageHeight = bitmap.getHeight();
-                Bitmap resized = getResizeImage(bitmap);
-                points = new MatOfKeyPoint();
 
-                List<Descriptor> descriptors = Descriptor.getDescriptors(resized, fd, points);
-
+                Uri uri = data.getData();
                 try {
-                    classify(descriptors);
-                } catch (RuntimeException e) {
-                    Toast toast = Toast.makeText(getApplicationContext(),
-                            e.getMessage(), Toast.LENGTH_LONG);
-                    toast.show();
-                    writeImageFile(bitmap);
-                    return;
+                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+                    imageHeight = bitmap.getHeight();
+                    Bitmap resized = getResizeImage(bitmap);
+                    points = new MatOfKeyPoint();
+
+                    List<Descriptor> descriptors = Descriptor.getDescriptors(resized, fd, points);
+
+                    try {
+                        classify(descriptors);
+                    } catch (RuntimeException e) {
+                        Toast toast = Toast.makeText(getApplicationContext(),
+                                e.getMessage(), Toast.LENGTH_LONG);
+                        toast.show();
+                        writeImageFile(bitmap);
+                        return;
+                    }
+
+
+                    MatOfPoint mainContour = getAndWriteRect(resized);
+                    List<Line> signLines = getLinesFromContour(mainContour);
+                    multiplyLines(signLines);
+
+                    System.out.println("main contour");
+                    Mat result = getRow(mainContour, resized);
+                    Mat gray = useFilter(result);
+                    List<Line> vLines = new ArrayList<Line>();
+                    try {
+                        vLines = getLines(gray, result);
+                    } catch (RuntimeException e) {
+                        Toast toast = Toast.makeText(getApplicationContext(),
+                                "Could not find lines", Toast.LENGTH_LONG);
+                        toast.show();
+                        writeImageFile(bitmap);
+                        return;
+                    }
+
+                    addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
+                    multiplyLines(vLines);
+                    if (isHeight) {
+                        Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
+                        addNumLines(vLines, -SHIFT_OF_SMALL_CROPPED);
+                        addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
+
+                        gray = useFilter(lastResult);
+                        try {
+                            vLines = getLines(gray, result);
+                        } catch (RuntimeException e) {
+                            Toast toast = Toast.makeText(getApplicationContext(),
+                                    "Could not find lines", Toast.LENGTH_LONG);
+                            toast.show();
+                            writeImageFile(bitmap);
+                            return;
+                        }
+                        Mat current = new Mat();
+                        List<Point> vPoints = lineToPoints(vLines, 0);
+                        List<Point> signPoints = lineToPoints(signLines, 1);
+                        vLines = fitLines(vLines, signPoints, lastResult);
+    //                System.out.println("get 100 100"+ current.get(100,100)[0]);
+    //                for (int i = 0; i < current.width(); i++) {
+    //                    System.out.println(current.get(1000,i)[0]);
+    //                }
+    //                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
+    //                Utils.matToBitmap(current, bitmap);
+                        //vLines = pointToLines(vPoints);
+                        signLines = pointToLines(signPoints);
+                        addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
+                        addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
+                        bitmap = drawLines(vLines, bitmap);
+                        bitmap = drawLines(signLines, bitmap);
+                        signLines = sortLines(signLines);
+                        double heightRow = countHeight(signLines, vLines);
+                        System.out.println("WE HAVE FOUND HEIGHT = " + height);
+                        height.setText(Double.toString(heightRow));
+                        ivCamera.setImageBitmap(bitmap);
+                        mAttacher = new PhotoViewAttacher(ivCamera);
+
+
+                    } else {
+                        Mat lastResult = getRowForWidth(getMatFromLines(signLines), bitmap);
+//                        addNumLines(vLines, -SHIFT_OF_SMALL_CROPPED);
+//                        addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
+
+//                        gray = useFilter(lastResult);
+//                        try {
+//                            vLines = getLines(gray, result);
+//                        } catch (RuntimeException e) {
+//                            Toast toast = Toast.makeText(getApplicationContext(),
+//                                    "Could not find lines", Toast.LENGTH_LONG);
+//                            toast.show();
+//                            writeImageFile(bitmap);
+//                            return;
+//                        }
+//                        Mat current = new Mat();
+//                        List<Point> vPoints = lineToPoints(vLines, 0);
+//                        List<Point> signPoints = lineToPoints(signLines, 1);
+//                        vLines = fitLines(vLines, signPoints, lastResult);
+//                        //                System.out.println("get 100 100"+ current.get(100,100)[0]);
+//                        //                for (int i = 0; i < current.width(); i++) {
+//                        //                    System.out.println(current.get(1000,i)[0]);
+//                        //                }
+//                        //                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
+//                        //                Utils.matToBitmap(current, bitmap);
+//                        //vLines = pointToLines(vPoints);
+//                        signLines = pointToLines(signPoints);
+//                        addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
+//                        addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
+//                        bitmap = drawLines(vLines, bitmap);
+//                        bitmap = drawLines(signLines, bitmap);
+//                        signLines = sortLines(signLines);
+//                        double heightRow = countHeight(signLines, vLines);
+//                        System.out.println("WE HAVE FOUND HEIGHT = " + height);
+//                        height.setText(Double.toString(heightRow));
+                        bitmap = Bitmap.createBitmap(lastResult.width(), lastResult.height(), Bitmap.Config.RGB_565);
+                        Utils.matToBitmap(lastResult, bitmap);
+                        ivCamera.setImageBitmap(bitmap);
+                        mAttacher = new PhotoViewAttacher(ivCamera);
+                    }
+                } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                 }
-
-
-
-                MatOfPoint mainContour = getAndWriteRect(resized);
-                List<Line> signLines = getLinesFromContour(mainContour);
-                multiplyLines(signLines);
-
-                System.out.println("main contour");
-                Mat result = getRow(mainContour, resized);
-                Mat gray  = useFilter(result);
-                List<Line> vLines = new ArrayList<Line>();
-                try {
-                    vLines = getLines(gray, result);
-                } catch (RuntimeException e) {
-                    Toast toast = Toast.makeText(getApplicationContext(),
-                            "Could not find lines", Toast.LENGTH_LONG);
-                    toast.show();
-                    writeImageFile(bitmap);
-                    return;
-                }
-
-                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
-                multiplyLines(vLines);
-                Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
-                addNumLines(vLines, -SHIFT_OF_SMALL_CROPPED);
-                addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
-
-                gray  = useFilter(lastResult);
-                try {
-                    vLines = getLines(gray, result);
-                } catch (RuntimeException e) {
-                    Toast toast = Toast.makeText(getApplicationContext(),
-                            "Could not find lines", Toast.LENGTH_LONG);
-                    toast.show();
-                    writeImageFile(bitmap);
-                    return;
-                }
-                Mat current = new Mat();
-                List<Point> vPoints = lineToPoints(vLines, 0);
-                List<Point> signPoints = lineToPoints(signLines, 1);
-                vLines = fitLines(vLines, signPoints, lastResult);
-                Mat img = new Mat();
-                Utils.bitmapToMat(bitmap, img);
-                current = WidthFind.findLines(img);
-//                System.out.println("get 100 100"+ current.get(100,100)[0]);
-//                for (int i = 0; i < current.width(); i++) {
-//                    System.out.println(current.get(1000,i)[0]);
-//                }
-//                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
-                Utils.matToBitmap(current, bitmap);
-//                //vLines = pointToLines(vPoints);
-//                signLines = pointToLines(signPoints);
-//                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
-//                addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
-//                bitmap = drawLines(vLines, bitmap);
-//                bitmap = drawLines(signLines, bitmap);
-//                signLines = sortLines(signLines);
-//                double heightRow = countHeight(signLines, vLines);
-//                System.out.println("WE HAVE FOUND HEIGHT = " + height);
-//                height.setText(Double.toString(heightRow));
-                ivCamera.setImageBitmap(bitmap);
-                mAttacher = new PhotoViewAttacher(ivCamera);
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
 //            System.out.println(uri.getAuthority());
         }
+    }
+
+    private Mat getRowForWidth(MatOfPoint mainContour, Bitmap bitmap) {
+        Mat imageCV = new Mat();
+        Utils.bitmapToMat(bitmap, imageCV);
+        System.out.println(mainContour.get(3, 0)[0] + " " + mainContour.get(3, 0)[1]);
+
+        List<Point> upPoints = getUpPointSign(mainContour);
+        Point p1 = upPoints.get(0);
+        Point p2 = upPoints.get(1);
+        System.out.println(p1);
+
+        Rect rect = new Rect((int)(( p1.x)*1.1),0, (int) ((p2.x - p1.x) * 0.8), (int) (p1.y*0.9));
+        SHIFT_OF_SMALL_CROPPED = (int) p1.x - (int) ((p2.x - p1.x) * 1);
+        System.out.println("rect === " + rect);
+        System.out.println("heigh" + imageCV.height());
+        System.out.println("width" + imageCV.width());
+        imageCV = new Mat(imageCV, rect);
+        System.out.println();
+
+        return imageCV;
+    }
+    private List<Point> getUpPointSign(MatOfPoint contour) {
+        int med = 0;
+        for (int i = 0; i < 4; i++) {
+            med += contour.get(i, 0)[1];
+        }
+        med /= 4;
+        List<Point> current = new ArrayList<Point>();
+
+        for (int i = 0; i < 4; i++) {
+            if (contour.get(i, 0)[1] <= med) {//y
+                current.add(new Point((int) contour.get(i, 0)[0], (int) contour.get(i, 0)[1]));
+            }
+        }
+        List<Point> result = new ArrayList<Point>();
+        if (current.get(0).x > current.get(1).x) {
+            result.add(current.get(1));
+            result.add(current.get(0));
+            return result;
+        }
+        return current;
     }
 
     private double countHeight(List<Line> signLines, List<Line> vLines) {
