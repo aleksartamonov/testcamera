@@ -44,7 +44,6 @@ public class Fitting {
             int r = (int) Math.pow(2, t);
             Mat thresh = new Mat();
             Imgproc.threshold(img, thresh, 120, 255, 0);
-            Imgproc.Laplacian(img, img, 0);
             Imgproc.blur(img, img, new Size(r, r));
             Imgproc.threshold(img, thresh, 1, 255, 0);
 

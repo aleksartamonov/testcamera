@@ -260,22 +260,25 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 List<Point> vPoints = lineToPoints(vLines, 0);
                 List<Point> signPoints = lineToPoints(signLines, 1);
                 vLines = fitLines(vLines, signPoints, lastResult);
+                Mat img = new Mat();
+                Utils.bitmapToMat(bitmap, img);
+                current = WidthFind.findLines(img);
 //                System.out.println("get 100 100"+ current.get(100,100)[0]);
 //                for (int i = 0; i < current.width(); i++) {
 //                    System.out.println(current.get(1000,i)[0]);
 //                }
 //                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
-//                Utils.matToBitmap(current, bitmap);
-                //vLines = pointToLines(vPoints);
-                signLines = pointToLines(signPoints);
-                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
-                addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
-                bitmap = drawLines(vLines, bitmap);
-                bitmap = drawLines(signLines, bitmap);
-                signLines = sortLines(signLines);
-                double heightRow = countHeight(signLines, vLines);
-                System.out.println("WE HAVE FOUND HEIGHT = " + height);
-                height.setText(Double.toString(heightRow));
+                Utils.matToBitmap(current, bitmap);
+//                //vLines = pointToLines(vPoints);
+//                signLines = pointToLines(signPoints);
+//                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
+//                addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
+//                bitmap = drawLines(vLines, bitmap);
+//                bitmap = drawLines(signLines, bitmap);
+//                signLines = sortLines(signLines);
+//                double heightRow = countHeight(signLines, vLines);
+//                System.out.println("WE HAVE FOUND HEIGHT = " + height);
+//                height.setText(Double.toString(heightRow));
                 ivCamera.setImageBitmap(bitmap);
                 mAttacher = new PhotoViewAttacher(ivCamera);
 
