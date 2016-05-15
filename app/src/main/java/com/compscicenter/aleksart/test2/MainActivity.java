@@ -27,6 +27,7 @@ import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
@@ -94,7 +95,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     List<Point> egorPoints = new ArrayList<Point>();
     List<Integer> ans = new ArrayList<Integer>();
 
-    private final int MIN_GOOD_POINTS = 1;
+    private final int MIN_GOOD_POINTS = 2;
 
     private String folderToSave = Environment.getExternalStorageDirectory()
             .toString();
@@ -206,9 +207,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Uri uri = data.getData();
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+
                 if (bitmap.getHeight() < bitmap.getWidth()) {
-                    RotateBitmap(bitmap);
+                    bitmap = rotateBitmap(bitmap);
                 }
+
                 imageHeight = bitmap.getHeight();
                 Bitmap resized = getResizeImage(bitmap);
                 points = new MatOfKeyPoint();
@@ -230,33 +233,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 List<Line> signLines = getLinesFromContour(mainContour);
                 multiplyLines(signLines);
 
-                bitmap = drawLines(signLines, bitmap);
-
-
-                System.out.println("main contour");
-                Mat result = getRow(mainContour, resized);
-                Mat gray = useFilter(result);
-                List<Line> vLines = new ArrayList<Line>();
-                try {
-                    vLines = getLines(gray, result);
-                } catch (RuntimeException e) {
-                    Toast toast = Toast.makeText(getApplicationContext(),
-                            "Could not find lines", Toast.LENGTH_LONG);
-                    toast.show();
-                    writeImageFile(bitmap);
-                    return;
-                }
-
-                addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
-                multiplyLines(vLines);
                 if (isHeight) {
                     Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
-                    addNumLines(vLines, -SHIFT_OF_SMALL_CROPPED);
                     addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
 
-                    gray = useFilter(lastResult);
+                    Mat gray = useFilter(lastResult);
+
+                    List<Line> vLines;
                     try {
-                        vLines = getLines(gray, result);
+                        vLines = getLines(gray, lastResult);
                     } catch (RuntimeException e) {
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
@@ -268,13 +253,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     List<Point> vPoints = lineToPoints(vLines, 0);
                     List<Point> signPoints = lineToPoints(signLines, 1);
                     vLines = fitLines(vLines, signPoints, lastResult);
-                    //                System.out.println("get 100 100"+ current.get(100,100)[0]);
-                    //                for (int i = 0; i < current.width(); i++) {
-                    //                    System.out.println(current.get(1000,i)[0]);
-                    //                }
-                    //                bitmap = Bitmap.createBitmap(current.width(), current.height(), Bitmap.Config.RGB_565);
-                    //                Utils.matToBitmap(current, bitmap);
-                    //vLines = pointToLines(vPoints);
                     signLines = pointToLines(signPoints);
                     addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
                     addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
@@ -290,7 +268,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
                 } else {
                     Mat lastResult = getRowForWidth(getMatFromLines(signLines), bitmap);
-                    gray = useFilter(lastResult);
+                    Mat gray = useFilter(lastResult);
+                    List<Line> vLines;
                     try {
                         vLines = getLines(gray, lastResult);
                     } catch (RuntimeException e) {
@@ -304,8 +283,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Imgproc.line(lastResult, vLines.get(1).getP1(), vLines.get(1).getP2(), new Scalar(0, 0, 255), 5);
                     double resWidth = HEIGHT_OF_SIGN*Math.abs(vLines.get(0).getP1().x - vLines.get(1).getP1().x) / SIGN_WIDTH;
                     width.setText(Double.toString(resWidth));
-                    //bitmap = Bitmap.createBitmap(lastResult.width(), lastResult.height(), Bitmap.Config.RGB_565);
-                    //Utils.matToBitmap(lastResult, bitmap);
+                    bitmap = Bitmap.createBitmap(lastResult.width(), lastResult.height(), Bitmap.Config.RGB_565);
+                    Utils.matToBitmap(lastResult, bitmap);
                     ivCamera.setImageBitmap(bitmap);
                     mAttacher = new PhotoViewAttacher(ivCamera);
                 }
@@ -318,15 +297,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-    private void RotateBitmap(Bitmap source)
-    {
-        Mat matrix = new Mat();
-        Utils.bitmapToMat(source, matrix);
-        Point center = new Point(matrix.cols()/2, matrix.rows()/2);
-        Mat rotImage = Imgproc.getRotationMatrix2D(center, 90, 1.0);
-        Imgproc.warpAffine(matrix, matrix, rotImage, matrix.size());
-        source = Bitmap.createBitmap(matrix.width(), matrix.height(), Bitmap.Config.RGB_565);
-        Utils.matToBitmap(matrix, source);
+    private Bitmap rotateBitmap(Bitmap bitmap) {
+        Mat temp = new Mat();
+        Utils.bitmapToMat(bitmap, temp);
+        Core.flip(temp.t(), temp, 1);
+        Bitmap res = Bitmap.createBitmap(temp.width(), temp.height(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(temp, res);
+        return res;
     }
 
     private Mat getRowForWidth(MatOfPoint mainContour, Bitmap bitmap) {
