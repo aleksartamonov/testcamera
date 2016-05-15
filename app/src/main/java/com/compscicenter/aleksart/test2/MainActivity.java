@@ -94,7 +94,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     List<Point> egorPoints = new ArrayList<Point>();
     List<Integer> ans = new ArrayList<Integer>();
 
-    private final int MIN_GOOD_POINTS = 10;
+    private final int MIN_GOOD_POINTS = 1;
 
     private String folderToSave = Environment.getExternalStorageDirectory()
             .toString();
@@ -206,6 +206,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Uri uri = data.getData();
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+                if (bitmap.getHeight() < bitmap.getWidth()) {
+                    RotateBitmap(bitmap);
+                }
                 imageHeight = bitmap.getHeight();
                 Bitmap resized = getResizeImage(bitmap);
                 points = new MatOfKeyPoint();
@@ -226,6 +229,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 MatOfPoint mainContour = getAndWriteRect(resized);
                 List<Line> signLines = getLinesFromContour(mainContour);
                 multiplyLines(signLines);
+
+                bitmap = drawLines(signLines, bitmap);
+
 
                 System.out.println("main contour");
                 Mat result = getRow(mainContour, resized);
@@ -310,6 +316,17 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
 //            System.out.println(uri.getAuthority());
         }
+    }
+
+    private void RotateBitmap(Bitmap source)
+    {
+        Mat matrix = new Mat();
+        Utils.bitmapToMat(source, matrix);
+        Point center = new Point(matrix.cols()/2, matrix.rows()/2);
+        Mat rotImage = Imgproc.getRotationMatrix2D(center, 90, 1.0);
+        Imgproc.warpAffine(matrix, matrix, rotImage, matrix.size());
+        source = Bitmap.createBitmap(matrix.width(), matrix.height(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(matrix, source);
     }
 
     private Mat getRowForWidth(MatOfPoint mainContour, Bitmap bitmap) {
