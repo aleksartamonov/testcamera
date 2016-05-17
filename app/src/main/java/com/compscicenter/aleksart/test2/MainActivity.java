@@ -19,6 +19,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.compscicenter.aleksart.test2.classificator.Classificator;
+import com.compscicenter.aleksart.test2.saver.Saver;
+import com.compscicenter.aleksart.test2.utils.Algorithm;
 import com.compscicenter.aleksart.test2.utils.Line;
 import com.compscicenter.aleksart.test2.utils.TypePoint;
 import com.example.aleksart.test2.R;
@@ -81,11 +83,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private FeatureDetector fd = null;
     private DescriptorExtractor dExtractor = null;
-    private Classifier smo = null;
-    List<Point> egorPoints = new ArrayList<Point>();
-    List<Integer> ans = new ArrayList<Integer>();
-
-    private final int MIN_GOOD_POINTS = 2;
+;
 
     private String folderToSave = Environment.getExternalStorageDirectory()
             .toString();
@@ -113,15 +111,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public void onResume() {
         super.onResume();
         OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_1_0, this, mLoaderCallback);
-
-
     }
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        Saver.setFolderToSave(folderToSave);
         setContentView(R.layout.activity_main);
         photo = (Button) findViewById(R.id.button1);
         getPhoto = (Button) findViewById(R.id.button2);
@@ -167,7 +162,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         FILE_SELECT_CODE);
             }
         });
-//        loadSVM();
         classificator = new Classificator(getApplicationContext().getResources().openRawResource(R.raw.svm));
 
     }
@@ -187,8 +181,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         } else if (requestCode == FILE_SELECT_CODE) {
 
             Uri uri = data.getData();
+            Bitmap bitmap = null;
             try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+                bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
 
                 if (bitmap.getHeight() < bitmap.getWidth()) {
                     bitmap = rotateBitmap(bitmap);
@@ -207,12 +202,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Toast toast = Toast.makeText(getApplicationContext(),
                             e.getMessage(), Toast.LENGTH_LONG);
                     toast.show();
-                    writeImageFile(bitmap);
+//                    writeImageFile(bitmap);
+                    Saver.savePhoto(bitmap);
                     return;
                 }
-
-
-                MatOfPoint mainContour = getAndWriteRect(resized, answer, getPointFromKeypoint(points.toArray()));
+//                MatOfPoint mainContour = getAndWriteRect(resized, answer, getPointFromKeypoint(points.toArray()));
+                MatOfPoint mainContour = Algorithm.findCountourSign(resized, answer, getPointFromKeypoint(points.toArray()));
                 List<Line> signLines = getLinesFromContour(mainContour);
                 multiplyLines(signLines);
 
@@ -229,7 +224,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
                         toast.show();
-                        writeImageFile(bitmap);
+//                        writeImageFile(bitmap);
+                        Saver.savePhoto(bitmap);
                         return;
                     }
                     Mat current = new Mat();
@@ -259,7 +255,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
                         toast.show();
-                        writeImageFile(bitmap);
+//                        writeImageFile(bitmap);
+                        Saver.savePhoto(bitmap);
                         return;
                     }
                     Imgproc.line(lastResult, vLines.get(0).getP1(), vLines.get(0).getP2(), new Scalar(0, 0, 255), 5);
@@ -275,6 +272,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
+            }
+            catch (Exception e) {
+                Toast toast = Toast.makeText(getApplicationContext(),
+                        "Could not find lines", Toast.LENGTH_LONG);
+                toast.show();
+//                writeImageFile(bitmap);
+                Saver.savePhoto(bitmap);
+                return;
             }
 
         }
@@ -678,100 +683,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             return result;
         }
         return current;
-    }
-
-    private MatOfPoint getAndWriteRect(Bitmap thumbnail, List<TypePoint> ans, List<Point> points) {
-        Mat imageCV = new Mat();
-        Mat imageRES = new Mat();
-        Utils.bitmapToMat(thumbnail, imageCV);
-        Utils.bitmapToMat(thumbnail, imageRES);
-        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2HSV_FULL);
-        Imgproc.cvtColor(imageCV, imageCV, Imgproc.COLOR_RGB2GRAY);
-
-        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-        Mat hierarchy = new Mat();
-        List<MatOfPoint> list = new ArrayList<MatOfPoint>();
-        Imgproc.threshold(imageCV, imageCV, 128, 255, 0);
-        Imgproc.findContours(imageCV, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
-
-        List<MatOfPoint2f> egor = new ArrayList<MatOfPoint2f>();
-        for (int i = 0; i < contours.size(); i++) {
-            double eps = 0.1 * Imgproc.arcLength(new MatOfPoint2f(contours.get(i).toArray()), true);
-            MatOfPoint2f m = new MatOfPoint2f();
-            Imgproc.approxPolyDP(new MatOfPoint2f(contours.get(i).toArray()), m, eps, true);
-            if (m.height() == 4) {
-                list.add(new MatOfPoint(m.toArray()));
-                egor.add(m);
-            }
-        }
-        int r = voting(points, egor, ans);
-        Line[] lines = new Line[4];
-        Mat cur = list.get(r);
-        for (int i = 0; i < cur.height(); i++) {
-            lines[i] = new Line(cur.get(i, 0)[0], cur.get(i, 0)[1], cur.get((i + 1) % cur.height(), 0)[0], cur.get((i + 1) % cur.height(), 0)[1]);
-        }
-        Scalar red = new Scalar(255, 0, 0);
-        for (Line l : lines) {
-            Imgproc.line(imageRES, l.getP1(), l.getP2(), red, 10);
-        }
-
-        MatOfPoint result = new MatOfPoint(lines[0].getP1(), lines[1].getP1(), lines[2].getP1(), lines[3].getP1());
-
-
-//        List<MatOfPoint> dra = new ArrayList<MatOfPoint>();
-//        dra.add(list.get(r));
-//        Imgproc.drawContours(imageRES, dra, -1, new Scalar(0, 255, 0), 5);
-        Utils.matToBitmap(imageRES, thumbnail);
-
-        return result;
-    }
-
-    private int voting(List<Point> points, List<MatOfPoint2f> contours, List<TypePoint> ans) {
-        int countourRating[] = new int[contours.size()];
-        Arrays.fill(countourRating, 0);
-        for (int i = 0; i < points.size(); i++) {
-            if (ans.get(i) == TypePoint.GOOD_POINT) {
-                for (int j = 0; j < contours.size(); j++) {
-                    double u = Imgproc.pointPolygonTest(contours.get(j), points.get(i), true);
-                    if (u > 0) countourRating[j] += 100;
-                    else countourRating[j] -= 1;
-                }
-            }
-        }
-        int best = -1, max = -(int) 1e8;
-        for (int i = 0; i < contours.size(); i++) {
-            if (countourRating[i] > max) {
-                best = i;
-                max = countourRating[i];
-            }
-        }
-//        for (int i = 0; i < contours.size(); i++)
-//            System.out.println("the best point " + countourRating[i]);
-//        System.out.println("Len " + best + " " + max);
-        return best;
-    }
-
-
-    private void writeImageFile(Bitmap bitmap) {
-        FileOutputStream fOut = null;
-        try {
-
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss")
-                    .format(new Date());
-            File file = new File(folderToSave, timeStamp + ".jpg");
-            fOut = new FileOutputStream(file);
-//            text.setText(file.getAbsolutePath());
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fOut);
-            fOut.flush();
-            fOut.close();
-
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
     }
 
 
