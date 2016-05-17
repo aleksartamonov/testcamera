@@ -2,6 +2,8 @@ package com.compscicenter.aleksart.test2.saver;
 
 import android.graphics.Bitmap;
 
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 
 import java.io.File;
@@ -37,6 +39,12 @@ public class Saver {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+    }
+
+    public static void saveMat(Mat imageCV) {
+        Bitmap targetBitmap = Bitmap.createBitmap(imageCV.width(), imageCV.height(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(imageCV, targetBitmap);
+        Saver.savePhoto(targetBitmap);
     }
 
     public static void setFolderToSave(String path) {

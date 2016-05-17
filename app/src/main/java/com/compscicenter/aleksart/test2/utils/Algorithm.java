@@ -87,7 +87,7 @@ public class Algorithm {
         System.out.println("width" + imageCV.width());
         imageCV = new Mat(imageCV, rect);
         System.out.println();
-
+        Saver.saveMat(imageCV);
         return imageCV;
     }
 
@@ -109,6 +109,8 @@ public class Algorithm {
         System.out.println("width" + imageCV.width());
         imageCV = new Mat(imageCV, rect);
         System.out.println();
+
+        Saver.saveMat(imageCV);
 
         return imageCV;
     }
@@ -166,5 +168,66 @@ public class Algorithm {
 
     public static double getSignWidth() {
         return SIGN_WIDTH;
+    }
+
+    public static List<Line> getLinesRow(Mat result, Mat colour) {
+        Mat lines = new Mat();
+        int threshold = 100;
+        Imgproc.threshold(result, result, 64, 255, 0);
+        Imgproc.HoughLinesP(result, lines, 1, Math.PI / 180, threshold, 100, 500);
+        Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(result, bitmap);
+
+//        return bitmap;
+        double max1 = 0, max2 = 0;
+        int best1 = 0, best2 = 0;
+        for (int i = 0; i < lines.height(); i++) {
+            double[] pts = lines.get(i, 0);
+            System.out.println(length(pts));
+            if (max1 < length(pts)) {
+                max1 = length(pts);
+                best1 = i;
+            }
+        }
+        for (int i = 0; i < lines.height(); i++) {
+            double[] pts = lines.get(i, 0);
+            if (i != best1 && max2 < length(pts) && notEqual(lines.get(best1, 0), lines.get(i, 0))) {
+                max2 = length(pts);
+                best2 = i;
+            }
+        }
+
+        double[] line1 = new double[4];
+        double[] line2 = new double[4];
+        System.out.println("max1.....");
+        System.out.println(max1);
+        System.out.println(max2);
+        for (int i = 0; i < 4; i++) {
+            line1[i] = lines.get(best1, 0)[i];
+            line2[i] = lines.get(best2, 0)[i];
+//            ls.put(0,i,lines.get(best1,i));
+//            ls.put(1, i, lines.get(best2, i));
+        }
+        List<Line> res = new ArrayList<Line>();
+        res.add(new Line(line1));
+        res.add(new Line(line2));
+        System.out.println("line1");
+        for (double e : line1) {
+            System.out.print(e + " ");
+        }
+        System.out.println();
+        System.out.println("line2");
+        for (double e : line2) {
+            System.out.print(e + " ");
+        }
+        return res;
+    }
+    private static double length(double[] pts) {
+        return (pts[0] - pts[2]) * (pts[0] - pts[2]) + (pts[1] - pts[3]) * (pts[1] - pts[3]);
+    }
+
+    private static boolean notEqual(double[] l1, double[] l2) {
+        return Math.abs(l1[0] - l2[0]) > 10 && Math.abs(l1[2] - l2[2]) > 10;
+
     }
 }

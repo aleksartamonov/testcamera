@@ -2,6 +2,9 @@ package com.compscicenter.aleksart.test2.utils;
 
 import org.opencv.core.Point;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Created by sergej on 4/2/16.
  */
@@ -62,6 +65,47 @@ public  class Line {
         p2.x += k;
         return this;
 
+    }
+
+    public static List<Line> sortLines(List<Line> lines) {
+        List<Line> result = new ArrayList<Line>();
+        double medX = 0, medY = 0;
+        for (Line p : lines) {
+            medX += p.getP1().x;
+            medY += p.getP1().y;
+            medX += p.getP2().x;
+            medY += p.getP2().y;
+        }
+        medX /= (lines.size() * 2);
+        medY /= (lines.size() * 2);
+
+        for (Line p : lines) {
+            if ((p.getP1().x - medX) < 0 && (p.getP2().x - medX) < 0) {
+                result.add(p);
+            }
+        }
+
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
+                result.add(p);
+            }
+        }
+
+
+        for (Line p : lines) {
+            if ((p.getP1().x - medX) > 0 && (p.getP2().x - medX) > 0) {
+                result.add(p);
+            }
+        }
+
+        for (Line p : lines) {
+            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
+                result.add(p);
+            }
+        }
+
+
+        return result;
     }
 
     public Point getP1() {

@@ -37,7 +37,6 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
-import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.features2d.DescriptorExtractor;
@@ -48,8 +47,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import uk.co.senab.photoview.PhotoViewAttacher;
-
-
 
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener {
@@ -74,7 +71,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private FeatureDetector fd = null;
     private DescriptorExtractor dExtractor = null;
-;
+    ;
 
     private String folderToSave = Environment.getExternalStorageDirectory()
             .toString();
@@ -200,16 +197,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 multiplyLines(signLines);
 
                 if (isHeight) {
-//                    Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
                     Mat lastResult = Algorithm.getRowForHeight(getMatFromLines(signLines), bitmap);
-//                    addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
                     addNumLines(signLines, -Algorithm.getShiftOfSmallCropped());
 
                     Mat gray = useFilter(lastResult);
 
                     List<Line> vLines;
                     try {
-                        vLines = getLines(gray, lastResult);
+                        vLines = Algorithm.getLinesRow(gray, lastResult);
                     } catch (RuntimeException e) {
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
@@ -226,7 +221,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     addNumLines(signLines, Algorithm.getShiftOfSmallCropped());
                     bitmap = drawLines(vLines, bitmap);
                     bitmap = drawLines(signLines, bitmap);
-                    signLines = sortLines(signLines);
+                    signLines = Line.sortLines(signLines);
                     double heightRow = countHeight(signLines, vLines);
                     System.out.println("WE HAVE FOUND HEIGHT = " + height);
                     height.setText(Double.toString(heightRow));
@@ -239,7 +234,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Mat gray = useFilter(lastResult);
                     List<Line> vLines;
                     try {
-                        vLines = getLines(gray, lastResult);
+                        vLines = Algorithm.getLinesRow(gray, lastResult);
                     } catch (RuntimeException e) {
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
@@ -258,8 +253,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     ivCamera.setImageBitmap(bitmap);
                     mAttacher = new PhotoViewAttacher(ivCamera);
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 Toast toast = Toast.makeText(getApplicationContext(),
                         "Could not find lines", Toast.LENGTH_LONG);
                 toast.show();
@@ -286,10 +280,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Utils.matToBitmap(temp, res);
         return res;
     }
-
-
-
-
 
     private double countHeight(List<Line> signLines, List<Line> vLines) {
         System.out.println("getP1.x " + signLines.get(0).getP1().x + " getP1.y " + signLines.get(0).getP1().y);
@@ -368,7 +358,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Imgproc.cvtColor(lastResult, gray, Imgproc.COLOR_BGR2GRAY);
 
 //        Mat res = Fitting.improveSign(signPoints, gray);
-//        List<Line> lineRow = getLines(lastResult,null);
+//        List<Line> lineRow = getLinesRow(lastResult,null);
         return Fitting.improvePole(vLines, lastResult);
 
     }
@@ -413,70 +403,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         bitmap = Bitmap.createBitmap(image.width(), image.height(), Bitmap.Config.RGB_565);
         Utils.matToBitmap(image, bitmap);
         return bitmap;
-
-    }
-
-    private double length(double[] pts) {
-        return (pts[0] - pts[2]) * (pts[0] - pts[2]) + (pts[1] - pts[3]) * (pts[1] - pts[3]);
-    }
-
-    private boolean notEqual(double[] l1, double[] l2) {
-        return Math.abs(l1[0] - l2[0]) > 10 && Math.abs(l1[2] - l2[2]) > 10;
-
-    }
-
-    private List<Line> getLines(Mat result, Mat colour) {
-        Mat lines = new Mat();
-        int threshold = 100;
-        Imgproc.threshold(result, result, 64, 255, 0);
-        Imgproc.HoughLinesP(result, lines, 1, Math.PI / 180, threshold, 100, 500);
-        Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.RGB_565);
-        Utils.matToBitmap(result, bitmap);
-
-//        return bitmap;
-        double max1 = 0, max2 = 0;
-        int best1 = 0, best2 = 0;
-        for (int i = 0; i < lines.height(); i++) {
-            double[] pts = lines.get(i, 0);
-            System.out.println(length(pts));
-            if (max1 < length(pts)) {
-                max1 = length(pts);
-                best1 = i;
-            }
-        }
-        for (int i = 0; i < lines.height(); i++) {
-            double[] pts = lines.get(i, 0);
-            if (i != best1 && max2 < length(pts) && notEqual(lines.get(best1, 0), lines.get(i, 0))) {
-                max2 = length(pts);
-                best2 = i;
-            }
-        }
-
-        double[] line1 = new double[4];
-        double[] line2 = new double[4];
-        System.out.println("max1.....");
-        System.out.println(max1);
-        System.out.println(max2);
-        for (int i = 0; i < 4; i++) {
-            line1[i] = lines.get(best1, 0)[i];
-            line2[i] = lines.get(best2, 0)[i];
-//            ls.put(0,i,lines.get(best1,i));
-//            ls.put(1, i, lines.get(best2, i));
-        }
-        List<Line> res = new ArrayList<Line>();
-        res.add(new Line(line1));
-        res.add(new Line(line2));
-        System.out.println("line1");
-        for (double e : line1) {
-            System.out.print(e + " ");
-        }
-        System.out.println();
-        System.out.println("line2");
-        for (double e : line2) {
-            System.out.print(e + " ");
-        }
-        return res;
-
 
     }
 
@@ -546,47 +472,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return cur;
     }
 
-    private List<Line> sortLines(List<Line> lines) {
-        List<Line> result = new ArrayList<Line>();
-        double medX = 0, medY = 0;
-        for (Line p : lines) {
-            medX += p.getP1().x;
-            medY += p.getP1().y;
-            medX += p.getP2().x;
-            medY += p.getP2().y;
-        }
-        medX /= (lines.size() * 2);
-        medY /= (lines.size() * 2);
 
-        for (Line p : lines) {
-            if ((p.getP1().x - medX) < 0 && (p.getP2().x - medX) < 0) {
-                result.add(p);
-            }
-        }
-
-        for (Line p : lines) {
-            if ((p.getP1().y - medY) < 0 && (p.getP2().y - medY) < 0) {
-                result.add(p);
-            }
-        }
-
-
-        for (Line p : lines) {
-            if ((p.getP1().x - medX) > 0 && (p.getP2().x - medX) > 0) {
-                result.add(p);
-            }
-        }
-
-        for (Line p : lines) {
-            if ((p.getP1().y - medY) > 0 && (p.getP2().y - medY) > 0) {
-                result.add(p);
-            }
-        }
-
-
-        return result;
-    }
-    
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
 
