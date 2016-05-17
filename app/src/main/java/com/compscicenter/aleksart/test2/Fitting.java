@@ -19,7 +19,7 @@ import java.util.List;
 public class Fitting {
     public static  double EPS_DIST = 30;
 
-    public static double count(Mat img, List<Point> points, Scalar colour, int width) {
+    private static double count(Mat img, List<Point> points, Scalar colour, int width) {
         Mat temp = img.clone();
 
         for (int i = 0; i < points.size(); i++) {
@@ -30,7 +30,7 @@ public class Fitting {
         return response.val[0];
     }
 
-    public static double countHorizLine(Mat img, Line line, Scalar colour, int width) {
+    private static double countHorizLine(Mat img, Line line, Scalar colour, int width) {
         Mat temp = img.clone();
         Imgproc.line(temp, line.getP1(), line.getP2(), colour, width);
         Scalar response = Core.sumElems(temp);
@@ -38,7 +38,7 @@ public class Fitting {
         return response.val[0];
     }
 
-    public static Mat improveSign(List<Point> points, Mat img) {
+    private static Mat improveSign(List<Point> points, Mat img) {
 
         for (int t = 2; t >= 0; t--) {
             int k = 2;
@@ -85,7 +85,7 @@ public class Fitting {
     }
 
 
-    public static List<Line> improvePole(List<Line> lines, Mat img) {
+    private static List<Line> improvePole(List<Line> lines, Mat img) {
         List<List<Point>> result = new ArrayList<List<Point>>();
         for (int i = 0; i < lines.size(); i++) {
             result.add(new ArrayList<Point>());
@@ -158,7 +158,7 @@ public class Fitting {
 
     }
 
-    public static double getB(List<Point> points, int height) {
+    private static double getB(List<Point> points, int height) {
         double xx = 0, xxy = 0, xy = 0, xxx = 0, x = 0;
         for (Point p: points) {
             xx += (height-p.y)*(height-p.y);
@@ -173,7 +173,7 @@ public class Fitting {
         return (xxy - (xy / xx) * xxx)*1.0/(xx -(x / xx) *xxx);
     }
 
-    public static double getK(List<Point> points, int height, double b) {
+    private static double getK(List<Point> points, int height, double b) {
         double xx = 0, xy = 0, x = 0;
         for (Point p: points) {
             xx += (height-p.y)*(height-p.y);
@@ -184,8 +184,15 @@ public class Fitting {
         return (xy - b * x) * 1.0/xx;
 
     }
+    public static List<Line> fitLines(List<Line> vLines, List<Point> signPoints, Mat lastResult) {
+        Mat gray = new Mat();
+        Imgproc.cvtColor(lastResult, gray, Imgproc.COLOR_BGR2GRAY);
 
-    public static double dist(Line l, Point p) {
+        return Fitting.improvePole(vLines, lastResult);
+
+    }
+
+    private static double dist(Line l, Point p) {
         return Math.abs( ((l.getP1().y - l.getP2().y) * p.x + (l.getP2().x - l.getP1().x) * p.y +
                 l.getP1().x * l.getP2().y - l.getP2().x * l.getP1().y)
                 /Math.sqrt( Math.pow(l.getP1().x - l.getP2().x,2 ) + Math.pow(l.getP1().y - l.getP2().y,2 ) ));

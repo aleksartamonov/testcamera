@@ -23,6 +23,7 @@ import com.compscicenter.aleksart.test2.saver.Saver;
 import com.compscicenter.aleksart.test2.utils.Algorithm;
 import com.compscicenter.aleksart.test2.utils.Line;
 import com.compscicenter.aleksart.test2.utils.TypePoint;
+import com.compscicenter.aleksart.test2.utils.Util;
 import com.example.aleksart.test2.R;
 
 import org.opencv.android.BaseLoaderCallback;
@@ -60,7 +61,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private TextView width;
     private AlertDialog choose = null;
     private final int RESIZE = 4;
-    private double HEIGHT_OF_SIGN = 0.7;
+
     private double imageHeight;
     private boolean isHeight = true;
 
@@ -188,13 +189,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Saver.savePhoto(bitmap);
                     return;
                 }
-                MatOfPoint mainContour = Algorithm.findCountourSign(resized, answer, getPointFromKeypoint(points.toArray()));
+                MatOfPoint mainContour = Algorithm.findCountourSign(resized, answer, Util.getPointFromKeypoint(points.toArray()));
                 List<Line> signLines = getLinesFromContour(mainContour);
-                multiplyLines(signLines);
+                Util.multiplyLines(signLines, RESIZE);
 
                 if (isHeight) {
                     Mat lastResult = Algorithm.getRowForHeight(getMatFromLines(signLines), bitmap);
-                    addNumLines(signLines, -Algorithm.getShiftOfSmallCropped());
+                    Util.addNumLines(signLines, -Algorithm.getShiftOfSmallCropped());
 
                     Mat gray = useFilter(lastResult);
 
@@ -208,17 +209,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         Saver.savePhoto(bitmap);
                         return;
                     }
-                    Mat current = new Mat();
-                    List<Point> vPoints = lineToPoints(vLines, 0);
-                    List<Point> signPoints = lineToPoints(signLines, 1);
-                    vLines = fitLines(vLines, signPoints, lastResult);
-                    signLines = pointToLines(signPoints);
-                    addNumLines(vLines, Algorithm.getShiftOfSmallCropped());
-                    addNumLines(signLines, Algorithm.getShiftOfSmallCropped());
+                    List<Point> signPoints = Util.lineToPoints(signLines, 1);
+                    vLines = Fitting.fitLines(vLines, signPoints, lastResult);
+                    signLines = Util.pointToLines(signPoints);
+                    Util.addNumLines(vLines, Algorithm.getShiftOfSmallCropped());
+                    Util.addNumLines(signLines, Algorithm.getShiftOfSmallCropped());
                     bitmap = drawLines(vLines, bitmap);
                     bitmap = drawLines(signLines, bitmap);
                     signLines = Line.sortLines(signLines);
-                    double heightRow = countHeight(signLines, vLines);
+                    double heightRow = Algorithm.countHeight(signLines, vLines, imageHeight);
                     System.out.println("WE HAVE FOUND HEIGHT = " + height);
                     height.setText(Double.toString(heightRow));
                     ivCamera.setImageBitmap(bitmap);
@@ -240,7 +239,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     }
                     Imgproc.line(lastResult, vLines.get(0).getP1(), vLines.get(0).getP2(), new Scalar(0, 0, 255), 5);
                     Imgproc.line(lastResult, vLines.get(1).getP1(), vLines.get(1).getP2(), new Scalar(0, 0, 255), 5);
-//                    double resWidth = HEIGHT_OF_SIGN * Math.abs(vLines.get(0).getP1().x - vLines.get(1).getP1().x) / SIGN_WIDTH;
                     double resWidth = Algorithm.getSignWidth() * Math.abs(vLines.get(0).getP1().x - vLines.get(1).getP1().x)
                             / Algorithm.getSignWidth();
                     width.setText(Double.toString(resWidth));
@@ -260,13 +258,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-    private List<Point> getPointFromKeypoint(KeyPoint[] keyPoints) {
-        List<Point> result = new ArrayList<Point>();
-        for (KeyPoint p : keyPoints) {
-            result.add(p.pt);
-        }
-        return result;
-    }
+
 
     private Bitmap rotateBitmap(Bitmap bitmap) {
         Mat temp = new Mat();
@@ -277,99 +269,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return res;
     }
 
-    private double countHeight(List<Line> signLines, List<Line> vLines) {
-        System.out.println("getP1.x " + signLines.get(0).getP1().x + " getP1.y " + signLines.get(0).getP1().y);
-        System.out.println("getP2.x " + signLines.get(0).getP2().x + " getP2.y " + signLines.get(0).getP2().y);
-        System.out.println("getP1.x " + signLines.get(1).getP1().x + " getP1.y " + signLines.get(1).getP1().y);
-        System.out.println("getP2.x " + signLines.get(1).getP2().x + " getP2.y " + signLines.get(1).getP2().y);
-        System.out.println("getP1.x " + signLines.get(2).getP1().x + " getP1.y " + signLines.get(2).getP1().y);
-        System.out.println("getP2.x " + signLines.get(2).getP2().x + " getP2.y " + signLines.get(2).getP2().y);
-        System.out.println("SPASE");
-        System.out.println("getP1.x " + vLines.get(0).getP1().x + " getP1.y " + vLines.get(0).getP1().y);
-        System.out.println("getP2.x " + vLines.get(0).getP2().x + " getP2.y " + vLines.get(0).getP2().y);
-        System.out.println("getP1.x " + vLines.get(1).getP1().x + " getP1.y " + vLines.get(1).getP1().y);
-        System.out.println("getP2.x " + vLines.get(1).getP2().x + " getP2.y " + vLines.get(1).getP2().y);
-        System.out.println("getP1.x " + vLines.get(2).getP1().x + " getP1.y " + vLines.get(2).getP1().y);
-        System.out.println("getP2.x " + vLines.get(2).getP2().x + " getP2.y " + vLines.get(2).getP2().y);
-        double x1 = vLines.get(1).getP1().y;
-        double x2 = (signLines.get(1).getP1().y + signLines.get(1).getP2().y) / 2;
-        double x3 = (signLines.get(3).getP1().y + signLines.get(3).getP2().y) / 2;
-        double beta = (1.0 / 3.0 * (x3 - x1) / imageHeight) * Math.PI;
-        double k = (x3 - x1) / (x3 - x2) + 1;
-        System.out.println("TANGENS BETA " + Math.tan(beta));
-        System.out.println("BETA " + beta);
-        System.out.println("K " + k);
-        System.out.println("HEIGHT " + HEIGHT_OF_SIGN);
-        return Math.tan(beta) / beta * k * HEIGHT_OF_SIGN;
-
-    }
-
-    private List<Line> pointToLines(List<Point> vPoints) {
-        List<Line> lines = new ArrayList<Line>();
-        for (int i = 0; i < vPoints.size(); i++) {
-            Point p1 = vPoints.get(i), p2 = vPoints.get((i + 1) % vPoints.size());
-            lines.add(new Line(p1.x, p1.y, p2.x, p2.y));
-        }
-        return lines;
-    }
-
-    private List<Point> lineToPoints(List<Line> vLines, int key) {
-        Point p1, p2, p3, p4;
-        if (vLines.size() == 2) {
-            p1 = new Point(vLines.get(0).getP1().x, vLines.get(0).getP1().y);
-            p2 = new Point(vLines.get(0).getP2().x, vLines.get(0).getP2().y);
-            p3 = new Point(vLines.get(1).getP1().x, vLines.get(1).getP1().y);
-            p4 = new Point(vLines.get(1).getP2().x, vLines.get(1).getP2().y);
-        } else {
-            p1 = new Point(vLines.get(0).getP1().x, vLines.get(0).getP1().y);
-            p2 = new Point(vLines.get(1).getP1().x, vLines.get(1).getP1().y);
-            p3 = new Point(vLines.get(2).getP1().x, vLines.get(2).getP1().y);
-            p4 = new Point(vLines.get(3).getP1().x, vLines.get(3).getP1().y);
-
-        }
-        if (key == 0) {
-            if (p1.y > p2.y) {
-                Point t = p1;
-                p1 = p2;
-                p2 = t;
-            }
-
-            if (p3.y < p4.y) {
-                Point t = p3;
-                p3 = p4;
-                p4 = t;
-            }
-        }
-        List<Point> points = new ArrayList<Point>();
-        points.add(p1);
-        points.add(p2);
-        points.add(p3);
-        points.add(p4);
-        return points;
-    }
 
 
-    private List<Line> fitLines(List<Line> vLines, List<Point> signPoints, Mat lastResult) {
-        Mat gray = new Mat();
-        Imgproc.cvtColor(lastResult, gray, Imgproc.COLOR_BGR2GRAY);
 
-//        Mat res = Fitting.improveSign(signPoints, gray);
-//        List<Line> lineRow = getLinesRow(lastResult,null);
-        return Fitting.improvePole(vLines, lastResult);
 
-    }
-
-    private void multiplyLines(List<Line> signLines) {
-        for (int i = 0; i < signLines.size(); i++) {
-            signLines.set(i, signLines.get(i).multiply1(RESIZE));
-        }
-    }
-
-    private void addNumLines(List<Line> signLines, int num) {
-        for (int i = 0; i < signLines.size(); i++) {
-            signLines.set(i, signLines.get(i).addNum(num));
-        }
-    }
 
     private List<Line> getLinesFromContour(MatOfPoint mainContour) {
         List<Line> res = new ArrayList<Line>();

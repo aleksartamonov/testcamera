@@ -23,6 +23,7 @@ import java.util.List;
 public class Algorithm {
     private static int SHIFT_OF_SMALL_CROPPED;
     private static double SIGN_WIDTH;
+    private static double HEIGHT_OF_SIGN = 0.7;
     public static MatOfPoint findCountourSign(Bitmap thumbnail, List<TypePoint> ans, List<Point> points) {
         Mat imageCV = new Mat();
         Mat imageRES = new Mat();
@@ -230,4 +231,32 @@ public class Algorithm {
         return Math.abs(l1[0] - l2[0]) > 10 && Math.abs(l1[2] - l2[2]) > 10;
 
     }
+
+    public static double countHeight(List<Line> signLines, List<Line> vLines, double imageHeight ) {
+        System.out.println("getP1.x " + signLines.get(0).getP1().x + " getP1.y " + signLines.get(0).getP1().y);
+        System.out.println("getP2.x " + signLines.get(0).getP2().x + " getP2.y " + signLines.get(0).getP2().y);
+        System.out.println("getP1.x " + signLines.get(1).getP1().x + " getP1.y " + signLines.get(1).getP1().y);
+        System.out.println("getP2.x " + signLines.get(1).getP2().x + " getP2.y " + signLines.get(1).getP2().y);
+        System.out.println("getP1.x " + signLines.get(2).getP1().x + " getP1.y " + signLines.get(2).getP1().y);
+        System.out.println("getP2.x " + signLines.get(2).getP2().x + " getP2.y " + signLines.get(2).getP2().y);
+        System.out.println("SPASE");
+        System.out.println("getP1.x " + vLines.get(0).getP1().x + " getP1.y " + vLines.get(0).getP1().y);
+        System.out.println("getP2.x " + vLines.get(0).getP2().x + " getP2.y " + vLines.get(0).getP2().y);
+        System.out.println("getP1.x " + vLines.get(1).getP1().x + " getP1.y " + vLines.get(1).getP1().y);
+        System.out.println("getP2.x " + vLines.get(1).getP2().x + " getP2.y " + vLines.get(1).getP2().y);
+        System.out.println("getP1.x " + vLines.get(2).getP1().x + " getP1.y " + vLines.get(2).getP1().y);
+        System.out.println("getP2.x " + vLines.get(2).getP2().x + " getP2.y " + vLines.get(2).getP2().y);
+        double x1 = vLines.get(1).getP1().y;
+        double x2 = (signLines.get(1).getP1().y + signLines.get(1).getP2().y) / 2;
+        double x3 = (signLines.get(3).getP1().y + signLines.get(3).getP2().y) / 2;
+        double beta = (1.0 / 3.0 * (x3 - x1) / imageHeight) * Math.PI;
+        double k = (x3 - x1) / (x3 - x2) + 1;
+        System.out.println("TANGENS BETA " + Math.tan(beta));
+        System.out.println("BETA " + beta);
+        System.out.println("K " + k);
+        System.out.println("HEIGHT " + HEIGHT_OF_SIGN);
+        return Math.tan(beta) / beta * k * HEIGHT_OF_SIGN;
+
+    }
+
 }
