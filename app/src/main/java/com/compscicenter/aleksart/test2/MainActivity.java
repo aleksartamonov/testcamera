@@ -58,15 +58,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private ImageView ivCamera;
     private TextView height;
     private TextView width;
-    private MatOfKeyPoint points = null;
     private AlertDialog choose = null;
-    private final int batchSize = 100;
     private final int RESIZE = 4;
-    private int SHIFT_OF_SMALL_CROPPED;
     private double HEIGHT_OF_SIGN = 0.7;
     private double imageHeight;
     private boolean isHeight = true;
-    private double SIGN_WIDTH;
 
 
     private FeatureDetector fd = null;
