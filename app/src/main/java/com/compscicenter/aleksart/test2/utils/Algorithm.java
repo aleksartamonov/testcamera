@@ -66,6 +66,7 @@ public class Algorithm {
         MatOfPoint result = new MatOfPoint(lines[0].getP1(), lines[1].getP1(), lines[2].getP1(), lines[3].getP1());
 
         Utils.matToBitmap(imageRES, thumbnail);
+        System.out.println("save  contourSight");
         Saver.savePhoto(thumbnail);
 
         return result;
@@ -88,6 +89,7 @@ public class Algorithm {
         System.out.println("width" + imageCV.width());
         imageCV = new Mat(imageCV, rect);
         System.out.println();
+        System.out.println("save  getRowForHeight");
         Saver.saveMat(imageCV);
         return imageCV;
     }
@@ -110,7 +112,7 @@ public class Algorithm {
         System.out.println("width" + imageCV.width());
         imageCV = new Mat(imageCV, rect);
         System.out.println();
-
+        System.out.println("save  getRowForWidth");
         Saver.saveMat(imageCV);
 
         return imageCV;

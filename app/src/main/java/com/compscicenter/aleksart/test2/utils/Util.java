@@ -1,6 +1,7 @@
 package com.compscicenter.aleksart.test2.utils;
 
 import org.opencv.core.KeyPoint;
+import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
 
 import java.util.ArrayList;
@@ -72,6 +73,16 @@ public class Util {
         for (int i = 0; i < signLines.size(); i++) {
             signLines.set(i, signLines.get(i).addNum(num));
         }
+    }
+
+    public static List<Line> getLinesFromContour(MatOfPoint mainContour) {
+        List<Line> res = new ArrayList<Line>();
+        int len = mainContour.height();
+        for (int i = 0; i < len; i++) {
+            res.add(new Line(mainContour.get(i, 0)[0], mainContour.get(i, 0)[1],
+                    mainContour.get((i + 1) % len, 0)[0], mainContour.get((i + 1) % len, 0)[1]));
+        }
+        return res;
     }
 
 

@@ -21,6 +21,7 @@ public class Saver {
 
     public static void savePhoto(Bitmap bitmap) {
         FileOutputStream fOut = null;
+        System.out.println("save photo +" +folderToSave);
         try {
 
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss")

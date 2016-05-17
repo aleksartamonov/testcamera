@@ -190,7 +190,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     return;
                 }
                 MatOfPoint mainContour = Algorithm.findCountourSign(resized, answer, Util.getPointFromKeypoint(points.toArray()));
-                List<Line> signLines = getLinesFromContour(mainContour);
+                List<Line> signLines = Util.getLinesFromContour(mainContour);
                 Util.multiplyLines(signLines, RESIZE);
 
                 if (isHeight) {
@@ -258,8 +258,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
-
-
     private Bitmap rotateBitmap(Bitmap bitmap) {
         Mat temp = new Mat();
         Utils.bitmapToMat(bitmap, temp);
@@ -270,19 +268,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
 
-
-
-
-
-    private List<Line> getLinesFromContour(MatOfPoint mainContour) {
-        List<Line> res = new ArrayList<Line>();
-        int len = mainContour.height();
-        for (int i = 0; i < len; i++) {
-            res.add(new Line(mainContour.get(i, 0)[0], mainContour.get(i, 0)[1],
-                    mainContour.get((i + 1) % len, 0)[0], mainContour.get((i + 1) % len, 0)[1]));
-        }
-        return res;
-    }
 
     private MatOfPoint getMatFromLines(List<Line> lines) {
         MatOfPoint result = new MatOfPoint();
