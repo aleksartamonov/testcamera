@@ -9,6 +9,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
@@ -20,6 +21,8 @@ import java.util.List;
  * Created by sergej on 5/17/16.
  */
 public class Algorithm {
+    private static int SHIFT_OF_SMALL_CROPPED;
+    private static double SIGN_WIDTH;
     public static MatOfPoint findCountourSign(Bitmap thumbnail, List<TypePoint> ans, List<Point> points) {
         Mat imageCV = new Mat();
         Mat imageRES = new Mat();
@@ -67,6 +70,71 @@ public class Algorithm {
         return result;
     }
 
+    public static Mat getRowForHeight(MatOfPoint mainContour, Bitmap bitmap) {
+        Mat imageCV = new Mat();
+        Utils.bitmapToMat(bitmap, imageCV);
+        System.out.println(mainContour.get(3, 0)[0] + " " + mainContour.get(3, 0)[1]);
+
+        List<Point> bottomPoints = getUpPointsSign(mainContour);
+        Point max_y = bottomPoints.get(0);
+        Point max_x = bottomPoints.get(1);
+        System.out.println(max_y);
+
+        Rect rect = new Rect((int) max_y.x - (int) ((max_x.x - max_y.x) * 1), 0, (int) ((max_x.x - max_y.x) * 3), (int) (max_y.y + 10));
+        SHIFT_OF_SMALL_CROPPED = (int) max_y.x - (int) ((max_x.x - max_y.x) * 1);
+        System.out.println("rect === " + rect);
+        System.out.println("heigh" + imageCV.height());
+        System.out.println("width" + imageCV.width());
+        imageCV = new Mat(imageCV, rect);
+        System.out.println();
+
+        return imageCV;
+    }
+
+    public static Mat getRowForWidth(MatOfPoint mainContour, Bitmap bitmap) {
+        Mat imageCV = new Mat();
+        Utils.bitmapToMat(bitmap, imageCV);
+        System.out.println(mainContour.get(3, 0)[0] + " " + mainContour.get(3, 0)[1]);
+
+        List<Point> upPoints = getUpPointsSign(mainContour);
+        Point p1 = upPoints.get(0);
+        Point p2 = upPoints.get(1);
+        SIGN_WIDTH = p2.x - p1.x;
+        System.out.println(p1);
+
+        Rect rect = new Rect((int) ((p1.x) * 1.1), 0, (int) ((p2.x - p1.x) * 0.8), (int) (p1.y * 0.9));
+        SHIFT_OF_SMALL_CROPPED = (int) p1.x - (int) ((p2.x - p1.x));
+        System.out.println("rect === " + rect);
+        System.out.println("heigh" + imageCV.height());
+        System.out.println("width" + imageCV.width());
+        imageCV = new Mat(imageCV, rect);
+        System.out.println();
+
+        return imageCV;
+    }
+
+    private static List<Point> getUpPointsSign(MatOfPoint contour) {
+        int med = 0;
+        for (int i = 0; i < 4; i++) {
+            med += contour.get(i, 0)[1];
+        }
+        med /= 4;
+        List<Point> current = new ArrayList<Point>();
+
+        for (int i = 0; i < 4; i++) {
+            if (contour.get(i, 0)[1] <= med) {//y
+                current.add(new Point((int) contour.get(i, 0)[0], (int) contour.get(i, 0)[1]));
+            }
+        }
+        List<Point> result = new ArrayList<Point>();
+        if (current.get(0).x > current.get(1).x) {
+            result.add(current.get(1));
+            result.add(current.get(0));
+            return result;
+        }
+        return current;
+    }
+
     private static int voting(List<Point> points, List<MatOfPoint2f> contours, List<TypePoint> ans) {
         int countourRating[] = new int[contours.size()];
         Arrays.fill(countourRating, 0);
@@ -90,5 +158,13 @@ public class Algorithm {
 //            System.out.println("the best point " + countourRating[i]);
 //        System.out.println("Len " + best + " " + max);
         return best;
+    }
+
+    public static int getShiftOfSmallCropped() {
+        return SHIFT_OF_SMALL_CROPPED;
+    }
+
+    public static double getSignWidth() {
+        return SIGN_WIDTH;
     }
 }

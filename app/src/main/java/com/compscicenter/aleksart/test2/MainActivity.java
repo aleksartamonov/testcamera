@@ -36,7 +36,6 @@ import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
-import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
@@ -45,18 +44,10 @@ import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 
 import uk.co.senab.photoview.PhotoViewAttacher;
-import weka.classifiers.Classifier;
 
 
 
@@ -196,24 +187,23 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 List<Descriptor> descriptors = Descriptor.getDescriptors(resized, fd, points);
                 List<TypePoint> answer = null;
                 try {
-//                    classify(descriptors);
                     answer = classificator.classify(descriptors);
                 } catch (RuntimeException e) {
                     Toast toast = Toast.makeText(getApplicationContext(),
                             e.getMessage(), Toast.LENGTH_LONG);
                     toast.show();
-//                    writeImageFile(bitmap);
                     Saver.savePhoto(bitmap);
                     return;
                 }
-//                MatOfPoint mainContour = getAndWriteRect(resized, answer, getPointFromKeypoint(points.toArray()));
                 MatOfPoint mainContour = Algorithm.findCountourSign(resized, answer, getPointFromKeypoint(points.toArray()));
                 List<Line> signLines = getLinesFromContour(mainContour);
                 multiplyLines(signLines);
 
                 if (isHeight) {
-                    Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
-                    addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
+//                    Mat lastResult = getRow(getMatFromLines(signLines), bitmap);
+                    Mat lastResult = Algorithm.getRowForHeight(getMatFromLines(signLines), bitmap);
+//                    addNumLines(signLines, -SHIFT_OF_SMALL_CROPPED);
+                    addNumLines(signLines, -Algorithm.getShiftOfSmallCropped());
 
                     Mat gray = useFilter(lastResult);
 
@@ -224,7 +214,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
                         toast.show();
-//                        writeImageFile(bitmap);
                         Saver.savePhoto(bitmap);
                         return;
                     }
@@ -233,8 +222,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     List<Point> signPoints = lineToPoints(signLines, 1);
                     vLines = fitLines(vLines, signPoints, lastResult);
                     signLines = pointToLines(signPoints);
-                    addNumLines(vLines, SHIFT_OF_SMALL_CROPPED);
-                    addNumLines(signLines, SHIFT_OF_SMALL_CROPPED);
+                    addNumLines(vLines, Algorithm.getShiftOfSmallCropped());
+                    addNumLines(signLines, Algorithm.getShiftOfSmallCropped());
                     bitmap = drawLines(vLines, bitmap);
                     bitmap = drawLines(signLines, bitmap);
                     signLines = sortLines(signLines);
@@ -246,7 +235,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
                 } else {
-                    Mat lastResult = getRowForWidth(getMatFromLines(signLines), bitmap);
+                    Mat lastResult = Algorithm.getRowForWidth(getMatFromLines(signLines), bitmap);
                     Mat gray = useFilter(lastResult);
                     List<Line> vLines;
                     try {
@@ -255,29 +244,25 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
                         toast.show();
-//                        writeImageFile(bitmap);
                         Saver.savePhoto(bitmap);
                         return;
                     }
                     Imgproc.line(lastResult, vLines.get(0).getP1(), vLines.get(0).getP2(), new Scalar(0, 0, 255), 5);
                     Imgproc.line(lastResult, vLines.get(1).getP1(), vLines.get(1).getP2(), new Scalar(0, 0, 255), 5);
-                    double resWidth = HEIGHT_OF_SIGN * Math.abs(vLines.get(0).getP1().x - vLines.get(1).getP1().x) / SIGN_WIDTH;
+//                    double resWidth = HEIGHT_OF_SIGN * Math.abs(vLines.get(0).getP1().x - vLines.get(1).getP1().x) / SIGN_WIDTH;
+                    double resWidth = Algorithm.getSignWidth() * Math.abs(vLines.get(0).getP1().x - vLines.get(1).getP1().x)
+                            / Algorithm.getSignWidth();
                     width.setText(Double.toString(resWidth));
                     bitmap = Bitmap.createBitmap(lastResult.width(), lastResult.height(), Bitmap.Config.RGB_565);
                     Utils.matToBitmap(lastResult, bitmap);
                     ivCamera.setImageBitmap(bitmap);
                     mAttacher = new PhotoViewAttacher(ivCamera);
                 }
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
             }
             catch (Exception e) {
                 Toast toast = Toast.makeText(getApplicationContext(),
                         "Could not find lines", Toast.LENGTH_LONG);
                 toast.show();
-//                writeImageFile(bitmap);
                 Saver.savePhoto(bitmap);
                 return;
             }
@@ -302,49 +287,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return res;
     }
 
-    private Mat getRowForWidth(MatOfPoint mainContour, Bitmap bitmap) {
-        Mat imageCV = new Mat();
-        Utils.bitmapToMat(bitmap, imageCV);
-        System.out.println(mainContour.get(3, 0)[0] + " " + mainContour.get(3, 0)[1]);
 
-        List<Point> upPoints = getUpPointSign(mainContour);
-        Point p1 = upPoints.get(0);
-        Point p2 = upPoints.get(1);
-        SIGN_WIDTH = p2.x - p1.x;
-        System.out.println(p1);
 
-        Rect rect = new Rect((int) ((p1.x) * 1.1), 0, (int) ((p2.x - p1.x) * 0.8), (int) (p1.y * 0.9));
-        SHIFT_OF_SMALL_CROPPED = (int) p1.x - (int) ((p2.x - p1.x) * 1);
-        System.out.println("rect === " + rect);
-        System.out.println("heigh" + imageCV.height());
-        System.out.println("width" + imageCV.width());
-        imageCV = new Mat(imageCV, rect);
-        System.out.println();
 
-        return imageCV;
-    }
-
-    private List<Point> getUpPointSign(MatOfPoint contour) {
-        int med = 0;
-        for (int i = 0; i < 4; i++) {
-            med += contour.get(i, 0)[1];
-        }
-        med /= 4;
-        List<Point> current = new ArrayList<Point>();
-
-        for (int i = 0; i < 4; i++) {
-            if (contour.get(i, 0)[1] <= med) {//y
-                current.add(new Point((int) contour.get(i, 0)[0], (int) contour.get(i, 0)[1]));
-            }
-        }
-        List<Point> result = new ArrayList<Point>();
-        if (current.get(0).x > current.get(1).x) {
-            result.add(current.get(1));
-            result.add(current.get(0));
-            return result;
-        }
-        return current;
-    }
 
     private double countHeight(List<Line> signLines, List<Line> vLines) {
         System.out.println("getP1.x " + signLines.get(0).getP1().x + " getP1.y " + signLines.get(0).getP1().y);
@@ -553,27 +498,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return bitmap;
     }
 
-    private Mat getRow(MatOfPoint mainContour, Bitmap bitmap) {
-        Mat imageCV = new Mat();
-        Utils.bitmapToMat(bitmap, imageCV);
-        System.out.println(mainContour.get(3, 0)[0] + " " + mainContour.get(3, 0)[1]);
-
-        List<Point> bottomPoints = getPoint(mainContour);
-        Point max_y = bottomPoints.get(0);
-        Point max_x = bottomPoints.get(1);
-        System.out.println(max_y);
-
-        Rect rect = new Rect((int) max_y.x - (int) ((max_x.x - max_y.x) * 1), 0, (int) ((max_x.x - max_y.x) * 3), (int) (max_y.y + 10));
-        SHIFT_OF_SMALL_CROPPED = (int) max_y.x - (int) ((max_x.x - max_y.x) * 1);
-        System.out.println("rect === " + rect);
-        System.out.println("heigh" + imageCV.height());
-        System.out.println("width" + imageCV.width());
-        imageCV = new Mat(imageCV, rect);
-        System.out.println();
-
-        return imageCV;
-    }
-
 
     private Mat getKernel() {
         Mat res = new Mat(5, 6, CvType.CV_32F);
@@ -662,30 +586,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
         return result;
     }
-
-    private List<Point> getPoint(MatOfPoint contour) {
-        int med = 0;
-        for (int i = 0; i < 4; i++) {
-            med += contour.get(i, 0)[1];
-        }
-        med /= 4;
-        List<Point> current = new ArrayList<Point>();
-
-        for (int i = 0; i < 4; i++) {
-            if (contour.get(i, 0)[1] <= med) {//y
-                current.add(new Point((int) contour.get(i, 0)[0], (int) contour.get(i, 0)[1]));
-            }
-        }
-        List<Point> result = new ArrayList<Point>();
-        if (current.get(0).x > current.get(1).x) {
-            result.add(current.get(1));
-            result.add(current.get(0));
-            return result;
-        }
-        return current;
-    }
-
-
+    
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
 
