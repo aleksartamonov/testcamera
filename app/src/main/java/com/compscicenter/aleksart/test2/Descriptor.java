@@ -22,7 +22,7 @@ import java.util.List;
 public class Descriptor {
     private List<Integer> data;
 
-    public static String getStr(){
+    public static String getStr() {
         return "AAA";
     }
 
@@ -41,7 +41,8 @@ public class Descriptor {
         sb.append(data.get(data.size() - 1));
         return sb.toString();
     }
-    public static List<Descriptor> getDescriptors(Bitmap thumbnail,FeatureDetector fd,MatOfKeyPoint points ) {
+
+    public static List<Descriptor> getDescriptors(Bitmap thumbnail, FeatureDetector fd, MatOfKeyPoint points) {
         Mat imageCV = new Mat();
         Utils.bitmapToMat(thumbnail, imageCV);
 //        Imgproc.resize(imageCV,imageCV,new Size(300,400));
@@ -55,13 +56,13 @@ public class Descriptor {
         int hist_size = 15;
         KeyPoint[] keyPoints = points.toArray();
         int count = 0;
-        for (int i = 0;i < keyPoints.length; i++) {
+        for (int i = 0; i < keyPoints.length; i++) {
 
             List<Integer> d = new ArrayList<Integer>();
             d.add(count % 2);
             count++;
-            d.add((int)keyPoints[i].response);
-            d.add((int)keyPoints[i].size);
+            d.add((int) keyPoints[i].response);
+            d.add((int) keyPoints[i].size);
             int minx = Math.max((int) keyPoints[i].pt.x - hist_size, 0);
             int miny = Math.max((int) keyPoints[i].pt.y - hist_size, 0);
             int maxx = Math.min((int) keyPoints[i].pt.x + hist_size, imageCV.width());
@@ -75,13 +76,13 @@ public class Descriptor {
             MatOfInt[] channels = new MatOfInt[3];
             Mat[] hists = new Mat[3];
             MatOfInt histSize = new MatOfInt(8);
-            MatOfFloat ranges = new MatOfFloat(0f,256.0f);
-            for (int j = 0; j < hists.length;j++) {
+            MatOfFloat ranges = new MatOfFloat(0f, 256.0f);
+            for (int j = 0; j < hists.length; j++) {
                 channels[j] = new MatOfInt(j);
                 hists[j] = new Mat();
                 Imgproc.calcHist(list, channels[j], new Mat(), hists[j], histSize, ranges);
                 for (int p = 0; p < hists[j].height(); p++) {
-                    d.add((int)hists[j].get(p, 0)[0]);
+                    d.add((int) hists[j].get(p, 0)[0]);
                 }
             }
             result.add(new Descriptor(d));

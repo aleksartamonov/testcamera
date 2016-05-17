@@ -1,5 +1,7 @@
 package com.compscicenter.aleksart.test2;
 
+import com.compscicenter.aleksart.test2.utils.Line;
+
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -10,7 +12,6 @@ import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
  * Created by sergej on 4/2/16.

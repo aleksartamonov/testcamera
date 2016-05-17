@@ -1,4 +1,4 @@
-package com.compscicenter.aleksart.test2;
+package com.compscicenter.aleksart.test2.utils;
 
 import org.opencv.core.Point;
 
@@ -7,20 +7,20 @@ import org.opencv.core.Point;
  */
 public  class Line {
     private Point p1,p2;
-    Line(Line l){
+    public Line(Line l){
         p1 = new Point(l.getP1().x, l.getP1().y);
         p2 = new Point(l.getP2().x, l.getP2().y);
     }
 
-    Line(Point p1,Point p2) {
+    public Line(Point p1, Point p2) {
         this.p1 = p1;
         this.p2 = p2;
     }
-    Line (double ... x) {
+    public Line (double ... x) {
         p1 = new Point((int)x[0],(int)x[1]);
         p2 = new Point((int)x[2],(int)x[3]);
     }
-    Line(double x1, double y1, double x2, double y2) {
+    public Line(double x1, double y1, double x2, double y2) {
         p1 = new Point((int)x1,(int)y1);
         p2 = new Point((int)x2,(int)y2);
     }

@@ -1,4 +1,4 @@
-package com.compscicenter.aleksart.test2;
+package com.compscicenter.aleksart.test2.utils;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
