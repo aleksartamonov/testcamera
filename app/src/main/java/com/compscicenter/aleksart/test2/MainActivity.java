@@ -3,6 +3,7 @@ package com.compscicenter.aleksart.test2;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -33,14 +34,12 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
-import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
-import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.FeatureDetector;
 import org.opencv.imgproc.Imgproc;
 
@@ -64,11 +63,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     private double imageHeight;
     private boolean isHeight = true;
+    public ProgressDialog dialog;
 
 
-    private FeatureDetector fd = null;
-    private DescriptorExtractor dExtractor = null;
-    ;
+    private FeatureDetector fd = null;;
 
     private String folderToSave = Environment.getExternalStorageDirectory()
             .toString();
@@ -110,22 +108,25 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         width = (TextView) findViewById(R.id.width);
         height.setText("height = need do");
         width.setText("width = need do");
+        dialog = new ProgressDialog(MainActivity.this);
+
+
 
         AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-// Add the buttons
         builder.setPositiveButton("width", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 isHeight = false;
+                photo.setText("width");
             }
         });
         builder.setNegativeButton("height", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
                 isHeight = true;
+                photo.setText("height");
             }
         });
 
 
-// Create the AlertDialog
         choose = builder.create();
 
 //        trainPhoto = getTrainPhoto();
@@ -135,6 +136,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 choose.show();
             }
         });
+//        dialog = ProgressDialog.show(this,"","Start",true,true);
         getPhoto.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -156,14 +158,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (fd == null) {
             fd = FeatureDetector.create(FeatureDetector.BRISK);
-            dExtractor = DescriptorExtractor.create(DescriptorExtractor.BRISK);
 
         }
         if (requestCode == CAMERA_RESULT) {
-            Bitmap thumbnail = (Bitmap) data.getExtras().get("data");
-
-
+            //TODO
         } else if (requestCode == FILE_SELECT_CODE) {
+
 
             Uri uri = data.getData();
             Bitmap bitmap = null;
@@ -189,18 +189,23 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Saver.savePhoto(bitmap);
                     return;
                 }
+                dialog.setMessage("find contour");
                 MatOfPoint mainContour = Algorithm.findCountourSign(resized, answer, Util.getPointFromKeypoint(points.toArray()));
+                dialog.setMessage("find lines");
                 List<Line> signLines = Util.getLinesFromContour(mainContour);
                 Util.multiplyLines(signLines, RESIZE);
 
                 if (isHeight) {
+//                    dialog.setMessage("get row for height");
                     Mat lastResult = Algorithm.getRowForHeight(getMatFromLines(signLines), bitmap);
                     Util.addNumLines(signLines, -Algorithm.getShiftOfSmallCropped());
 
+//                    dialog.setMessage("use filter");
                     Mat gray = useFilter(lastResult);
 
                     List<Line> vLines;
                     try {
+//                        dialog.setMessage("get lines for row");
                         vLines = Algorithm.getLinesRow(gray, lastResult);
                     } catch (RuntimeException e) {
                         Toast toast = Toast.makeText(getApplicationContext(),
@@ -247,6 +252,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     ivCamera.setImageBitmap(bitmap);
                     mAttacher = new PhotoViewAttacher(ivCamera);
                 }
+                dialog.dismiss();
             } catch (Exception e) {
                 Toast toast = Toast.makeText(getApplicationContext(),
                         "Could not find lines", Toast.LENGTH_LONG);
@@ -258,12 +264,25 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
     }
 
+    private void showProgressDialog() {
+        dialog = new ProgressDialog(MainActivity.this);
+        dialog.setMessage("Calculate");
+        dialog.setIndeterminate(true);
+        dialog.setCancelable(true);
+        dialog.show();
+
+    }
+
+
+
+
     private Bitmap rotateBitmap(Bitmap bitmap) {
         Mat temp = new Mat();
         Utils.bitmapToMat(bitmap, temp);
         Core.flip(temp.t(), temp, 1);
         Bitmap res = Bitmap.createBitmap(temp.width(), temp.height(), Bitmap.Config.RGB_565);
         Utils.matToBitmap(temp, res);
+
         return res;
     }
 
