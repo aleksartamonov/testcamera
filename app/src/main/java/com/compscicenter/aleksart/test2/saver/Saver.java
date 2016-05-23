@@ -18,18 +18,19 @@ import java.util.Date;
  */
 public class Saver {
     private static String folderToSave;
+    private static int counter = 0;
 
     public static void savePhoto(Bitmap bitmap) {
         FileOutputStream fOut = null;
         System.out.println("save photo +" +folderToSave);
         try {
-
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss")
                     .format(new Date());
-            File file = new File(folderToSave, timeStamp + ".jpg");
+            File file = new File(folderToSave, timeStamp + counter + ".jpg");
             fOut = new FileOutputStream(file);
 //            text.setText(file.getAbsolutePath());
             bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fOut);
+            counter++;
             fOut.flush();
             fOut.close();
 

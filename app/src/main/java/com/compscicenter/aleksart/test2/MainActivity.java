@@ -59,7 +59,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private TextView height;
     private TextView width;
     private AlertDialog choose = null;
-    private final int RESIZE = 4;
+    private final int RESIZE = 1;
 
     private double imageHeight;
     private boolean isHeight = true;
@@ -207,6 +207,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     try {
 //                        dialog.setMessage("get lines for row");
                         vLines = Algorithm.getLinesRow(gray, lastResult);
+                        Saver.savePhoto(bitmap);
                     } catch (RuntimeException e) {
                         Toast toast = Toast.makeText(getApplicationContext(),
                                 "Could not find lines", Toast.LENGTH_LONG);
@@ -319,7 +320,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Point pt1 = lines.get(i).getP1();
             Point pt2 = lines.get(i).getP2();
 
-            Imgproc.line(result, pt1, pt2, r, 3);
+            Imgproc.line(result, pt1, pt2, r, 1);
 
         }
         Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.RGB_565);
